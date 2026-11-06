@@ -27,6 +27,7 @@ class AppDatabase {
   static const String _sessionsTable = 'sessions';
   static const String _attendanceRecordsTable = 'attendance_records';
   static const String _studentEnrollmentsTable = 'student_enrollments';
+  static const String _sessionActasTable = 'session_actas';
 
   final DatabaseFactory? _factory;
   final String? _databasePath;
@@ -73,6 +74,7 @@ class AppDatabase {
     batch.execute(_createSessionsTable);
     batch.execute(_createAttendanceRecordsTable);
     batch.execute(_createStudentEnrollmentsTable);
+    batch.execute(_createSessionActasTable);
     batch.execute(_createStudentsCourseIndex);
     batch.execute(_createAttendanceSessionIndex);
     await batch.commit(noResult: true);
@@ -85,6 +87,36 @@ class AppDatabase {
   ) async {
     if (oldVersion < 2) {
       await db.execute(_createStudentEnrollmentsTable);
+    }
+    if (oldVersion < 3) {
+      await db.execute(_createSessionActasTable);
+      await _ensureColumn(
+        db,
+        table: _attendanceRecordsTable,
+        column: 'time_tick',
+        definition: 'INTEGER',
+      );
+      await _ensureColumn(
+        db,
+        table: _attendanceRecordsTable,
+        column: 'observation',
+        definition: 'TEXT',
+      );
+    }
+  }
+
+  static Future<void> _ensureColumn(
+    Database db, {
+    required String table,
+    required String column,
+    required String definition,
+  }) async {
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    final exists = columns.any((Map<String, Object?> row) {
+      return row['name'] == column;
+    });
+    if (!exists) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
     }
   }
 
@@ -255,6 +287,29 @@ class AppDatabase {
   // Sesiones
   // ---------------------------------------------------------------------------
 
+  /// Crea o actualiza una sesión de clase de forma transaccional.
+  ///
+  /// Se actualiza por `id` y, si no existe, se inserta. A diferencia de
+  /// `ConflictAlgorithm.replace`, este upsert no borra en cascada los registros
+  /// de asistencia asociados a la sesión.
+  Future<void> upsertSession(SessionModel session) async {
+    _validateRoomPin(session.roomPin);
+    _validateBitmapHex(session.bitmapHex);
+    final values = session.toMap();
+    final db = await database;
+    await db.transaction((Transaction txn) async {
+      final updated = await txn.update(
+        _sessionsTable,
+        values,
+        where: 'id = ?',
+        whereArgs: <Object?>[session.id],
+      );
+      if (updated == 0) {
+        await txn.insert(_sessionsTable, values);
+      }
+    });
+  }
+
   /// Crea una sesión de clase con su PIN verbal de dos dígitos.
   Future<void> insertSession(SessionModel session) async {
     _validateRoomPin(session.roomPin);
@@ -297,26 +352,26 @@ class AppDatabase {
   }) async {
     _validateBitmapHex(bitmapHex);
     final db = await database;
-    final updated = await db.update(
-      _sessionsTable,
-      <String, Object?>{'bitmap_hex': bitmapHex},
-      where: 'id = ?',
-      whereArgs: <Object?>[sessionId],
-    );
-    if (updated == 0) {
-      throw StateError('La sesión $sessionId no existe.');
-    }
+    await _writeSessionBitmap(db, sessionId: sessionId, bitmapHex: bitmapHex);
   }
 
-  /// Cierra la sesión guardando su fecha de cierre y el hash del acta.
+  /// Cierra la sesión guardando su fecha de cierre, el Bitmap y el hash del
+  /// acta.
   Future<void> closeSession({
     required String sessionId,
     required String closedAt,
     String? actHash,
+    String? bitmapHex,
   }) async {
+    if (bitmapHex != null) {
+      _validateBitmapHex(bitmapHex);
+    }
     final values = <String, Object?>{'closed_at': closedAt};
     if (actHash != null) {
       values['act_hash'] = actHash;
+    }
+    if (bitmapHex != null) {
+      values['bitmap_hex'] = bitmapHex;
     }
     final db = await database;
     final updated = await db.update(
@@ -330,6 +385,95 @@ class AppDatabase {
     }
   }
 
+  /// Cierra la sesión y guarda en una sola transacción el acta JSON firmada.
+  ///
+  /// El resumen y los registros completos viajan dentro de [actaJson]; la
+  /// firma HMAC se conserva por separado para auditoría y verificación rápida.
+  Future<void> closeSessionWithActa({
+    required String sessionId,
+    required String closedAt,
+    required String bitmapHex,
+    required String actaJson,
+    required String actaHmacSignature,
+    String? actHash,
+  }) async {
+    _validateBitmapHex(bitmapHex);
+    if (actaJson.trim().isEmpty) {
+      throw ArgumentError.value(
+        actaJson,
+        'actaJson',
+        'El acta JSON no puede estar vacía.',
+      );
+    }
+    if (!RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(actaHmacSignature)) {
+      throw ArgumentError.value(
+        actaHmacSignature,
+        'actaHmacSignature',
+        'La firma HMAC debe ser hexadecimal de 64 caracteres.',
+      );
+    }
+
+    final sessionValues = <String, Object?>{
+      'closed_at': closedAt,
+      'bitmap_hex': bitmapHex,
+    };
+    if (actHash != null) {
+      sessionValues['act_hash'] = actHash;
+    }
+
+    final db = await database;
+    await db.transaction((Transaction txn) async {
+      final updated = await txn.update(
+        _sessionsTable,
+        sessionValues,
+        where: 'id = ?',
+        whereArgs: <Object?>[sessionId],
+      );
+      if (updated == 0) {
+        throw StateError('La sesión $sessionId no existe.');
+      }
+      await txn.insert(_sessionActasTable, <String, Object?>{
+        'session_id': sessionId,
+        'closed_at': closedAt,
+        'bitmap_hex': bitmapHex,
+        'acta_json': actaJson,
+        'acta_hmac_signature': actaHmacSignature,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
+  /// Recupera el JSON firmado del acta o `null` si aún no se cerró.
+  Future<String?> getSessionActaJson(String sessionId) async {
+    final db = await database;
+    final rows = await db.query(
+      _sessionActasTable,
+      columns: <String>['acta_json'],
+      where: 'session_id = ?',
+      whereArgs: <Object?>[sessionId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+    return rows.first['acta_json'] as String?;
+  }
+
+  /// Recupera la firma HMAC del acta o `null` si aún no se cerró.
+  Future<String?> getSessionActaSignature(String sessionId) async {
+    final db = await database;
+    final rows = await db.query(
+      _sessionActasTable,
+      columns: <String>['acta_hmac_signature'],
+      where: 'session_id = ?',
+      whereArgs: <Object?>[sessionId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+    return rows.first['acta_hmac_signature'] as String?;
+  }
+
   // ---------------------------------------------------------------------------
   // Registros de asistencia
   // ---------------------------------------------------------------------------
@@ -340,6 +484,71 @@ class AppDatabase {
     _validateAttendanceMethod(record.method);
     final db = await database;
     await db.insert(_attendanceRecordsTable, record.toMap());
+  }
+
+  /// Inserta o actualiza el registro de un estudiante dentro de una sesión.
+  ///
+  /// El upsert se resuelve por `(session_id, student_id)` para que un nuevo
+  /// anuncio BLE actualice RSSI, tick y token sin duplicar la fila. Si se
+  /// proporciona [bitmapHex], el Bitmap de la sesión se actualiza dentro de la
+  /// misma transacción que el registro.
+  Future<void> upsertAttendanceRecord(
+    AttendanceRecordModel record, {
+    String? bitmapHex,
+  }) async {
+    _validateBitIndex(record.bitIndex);
+    _validateAttendanceMethod(record.method);
+    if (bitmapHex != null) {
+      _validateBitmapHex(bitmapHex);
+    }
+
+    final values = record.toMap();
+    final db = await database;
+    await db.transaction((Transaction txn) async {
+      if (bitmapHex != null) {
+        await _writeSessionBitmap(
+          txn,
+          sessionId: record.sessionId,
+          bitmapHex: bitmapHex,
+        );
+      }
+      final updated = await txn.update(
+        _attendanceRecordsTable,
+        values,
+        where: 'session_id = ? AND student_id = ?',
+        whereArgs: <Object?>[record.sessionId, record.studentId],
+      );
+      if (updated == 0) {
+        await txn.insert(_attendanceRecordsTable, values);
+      }
+    });
+  }
+
+  /// Elimina el registro de un estudiante y, opcionalmente, apaga su bit en la
+  /// sesión dentro de la misma transacción.
+  Future<void> deleteAttendanceRecord({
+    required String sessionId,
+    required String studentId,
+    String? bitmapHex,
+  }) async {
+    if (bitmapHex != null) {
+      _validateBitmapHex(bitmapHex);
+    }
+    final db = await database;
+    await db.transaction((Transaction txn) async {
+      if (bitmapHex != null) {
+        await _writeSessionBitmap(
+          txn,
+          sessionId: sessionId,
+          bitmapHex: bitmapHex,
+        );
+      }
+      await txn.delete(
+        _attendanceRecordsTable,
+        where: 'session_id = ? AND student_id = ?',
+        whereArgs: <Object?>[sessionId, studentId],
+      );
+    });
   }
 
   /// Lista los registros de asistencia de una sesión en orden cronológico.
@@ -412,6 +621,22 @@ class AppDatabase {
     }
   }
 
+  static Future<void> _writeSessionBitmap(
+    DatabaseExecutor executor, {
+    required String sessionId,
+    required String bitmapHex,
+  }) async {
+    final updated = await executor.update(
+      _sessionsTable,
+      <String, Object?>{'bitmap_hex': bitmapHex},
+      where: 'id = ?',
+      whereArgs: <Object?>[sessionId],
+    );
+    if (updated == 0) {
+      throw StateError('La sesión $sessionId no existe.');
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Esquema SQLite
   // ---------------------------------------------------------------------------
@@ -478,6 +703,8 @@ class AppDatabase {
       rssi_avg REAL,
       recorded_at TEXT NOT NULL,
       hmac_tag TEXT,
+      time_tick INTEGER,
+      observation TEXT,
       UNIQUE (session_id, student_id),
       FOREIGN KEY (session_id) REFERENCES $_sessionsTable (id) ON DELETE CASCADE,
       FOREIGN KEY (student_id) REFERENCES $_studentsTable (id) ON DELETE CASCADE
@@ -499,6 +726,18 @@ class AppDatabase {
       device_secret TEXT NOT NULL,
       shared_secret TEXT NOT NULL,
       enrolled_at_epoch_ms INTEGER NOT NULL
+    )
+  ''';
+
+  static const String _createSessionActasTable =
+      '''
+    CREATE TABLE IF NOT EXISTS $_sessionActasTable (
+      session_id TEXT PRIMARY KEY,
+      closed_at TEXT NOT NULL,
+      bitmap_hex TEXT NOT NULL CHECK (length(bitmap_hex) = ${AppConstants.bitmapHexLength}),
+      acta_json TEXT NOT NULL,
+      acta_hmac_signature TEXT NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES $_sessionsTable (id) ON DELETE CASCADE
     )
   ''';
 

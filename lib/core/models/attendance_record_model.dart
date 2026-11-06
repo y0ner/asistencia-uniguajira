@@ -9,6 +9,8 @@ class AttendanceRecordModel {
     required this.recordedAt,
     this.rssiAvg,
     this.hmacTag,
+    this.timeTick,
+    this.observation,
   });
 
   /// Construye el modelo a partir de una fila SQLite.
@@ -22,6 +24,8 @@ class AttendanceRecordModel {
       rssiAvg: (map['rssi_avg'] as num?)?.toDouble(),
       recordedAt: map['recorded_at']! as String,
       hmacTag: map['hmac_tag'] as String?,
+      timeTick: map['time_tick'] as int?,
+      observation: map['observation'] as String?,
     );
   }
 
@@ -49,6 +53,12 @@ class AttendanceRecordModel {
   /// Etiqueta HMAC-SHA256 que respalda el registro BLE.
   final String? hmacTag;
 
+  /// Tick de la ventana HMAC en la que se aceptó el anuncio BLE.
+  final int? timeTick;
+
+  /// Observación escrita por el docente al usar la lista invertida.
+  final String? observation;
+
   /// Serializa el modelo a una fila SQLite.
   Map<String, Object?> toMap() {
     return <String, Object?>{
@@ -60,6 +70,8 @@ class AttendanceRecordModel {
       'rssi_avg': rssiAvg,
       'recorded_at': recordedAt,
       'hmac_tag': hmacTag,
+      'time_tick': timeTick,
+      'observation': observation,
     };
   }
 
@@ -73,6 +85,8 @@ class AttendanceRecordModel {
     double? rssiAvg,
     String? recordedAt,
     String? hmacTag,
+    int? timeTick,
+    String? observation,
   }) {
     return AttendanceRecordModel(
       id: id ?? this.id,
@@ -83,6 +97,8 @@ class AttendanceRecordModel {
       rssiAvg: rssiAvg ?? this.rssiAvg,
       recordedAt: recordedAt ?? this.recordedAt,
       hmacTag: hmacTag ?? this.hmacTag,
+      timeTick: timeTick ?? this.timeTick,
+      observation: observation ?? this.observation,
     );
   }
 
