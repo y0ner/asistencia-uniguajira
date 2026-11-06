@@ -7,6 +7,7 @@ import '../../core/models/session_model.dart';
 import '../../core/models/student_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/roster_import_service.dart';
+import 'course_reports_screen.dart';
 import 'live_attendance_session_screen.dart';
 import 'roster_import_modal.dart';
 import 'signed_acta_dialog.dart';
@@ -209,6 +210,20 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     }
   }
 
+  Future<void> _openReportsScreen() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => CourseReportsScreen(
+          course: widget.course,
+          database: _database,
+        ),
+      ),
+    );
+    if (mounted) {
+      await _loadData();
+    }
+  }
+
   Future<void> _viewSessionActa(SessionModel session) async {
     try {
       final actaJson = await _database.getSessionActaJson(session.id);
@@ -252,6 +267,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           backgroundColor: theme.colorScheme.primary,
           foregroundColor: theme.colorScheme.onPrimary,
           actions: <Widget>[
+            IconButton(
+              icon: const Icon(Icons.assessment_outlined),
+              tooltip: 'Reportes y Excel (.xlsx)',
+              onPressed: _openReportsScreen,
+            ),
             IconButton(
               icon: const Icon(Icons.refresh),
               tooltip: 'Actualizar datos',
@@ -301,26 +321,45 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         // Tarjeta de cabecera: Datos del curso y capacidad de Bitmap
         _buildCourseHeaderCard(theme, count, maxBits, fraction),
 
-        // Botón destacado: Cargar / Agregar Estudiantes
+        // Botonera de acciones: Cargar Estudiantes y Reportes/Excel (.xlsx)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: count >= maxBits ? null : _openImportModal,
-              icon: const Icon(Icons.group_add_outlined),
-              label: Text(
-                count >= maxBits
-                    ? 'Capacidad Completa (64/64)'
-                    : 'Cargar / Agregar Estudiantes',
-              ),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                flex: 3,
+                child: FilledButton.icon(
+                  onPressed: count >= maxBits ? null : _openImportModal,
+                  icon: const Icon(Icons.group_add_outlined),
+                  label: Text(
+                    count >= maxBits
+                        ? 'Capacidad (64/64)'
+                        : 'Cargar Estudiantes',
+                  ),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: FilledButton.tonalIcon(
+                  onPressed: _openReportsScreen,
+                  icon: const Icon(Icons.assessment_outlined),
+                  label: const Text('Reportes'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
 
