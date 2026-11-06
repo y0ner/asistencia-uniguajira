@@ -40,15 +40,30 @@ abstract final class AppConstants {
   /// Longitud del PIN verbal de la sesión (2 dígitos).
   static const int roomPinLength = 2;
 
+  /// PIN verbal mínimo que puede generar el docente.
+  static const int minimumSessionPin = 10;
+
+  /// PIN verbal máximo que puede generar el docente.
+  static const int maximumSessionPin = 99;
+
+  /// Intervalo de reemisión del eco docente con el Bitmap actualizado.
+  static const int teacherEchoIntervalSeconds = 1;
+
   /// Método de registro por proximidad criptográfica BLE.
   static const String attendanceMethodBleHmac = 'BLE_HMAC';
 
   /// Método de registro manual desde la lista invertida de excepción.
   static const String attendanceMethodManualInverted = 'MANUAL_INVERTED';
 
+  /// Estado de un estudiante presente en el acta de cierre.
+  static const String attendanceStatusPresent = 'PRESENT';
+
+  /// Estado de un estudiante ausente en el acta de cierre.
+  static const String attendanceStatusAbsent = 'ABSENT';
+
   /// Nombre del archivo SQLite local.
   static const String databaseName = 'asistencia_uniguajira.db';
 
   /// Versión del esquema SQLite.
-  static const int databaseVersion = 2;
+  static const int databaseVersion = 3;
 }

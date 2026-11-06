@@ -9,6 +9,7 @@ import '../../core/crypto/ble_packet_codec.dart';
 import '../../core/models/student_enrollment_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/student_enrollment_service.dart';
+import 'student_live_beacon_screen.dart';
 import 'student_qr_enrollment_screen.dart';
 
 /// Pantalla principal de la billetera de cursos enrolados del estudiante.
@@ -161,12 +162,14 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
     }
   }
 
-  void _showBleAttendanceDialog(StudentEnrollmentModel enrollment) {
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext ctx) {
-        return StudentBleAttendancePreviewDialog(enrollment: enrollment);
-      },
+  void _openLiveBeaconScreen(StudentEnrollmentModel enrollment) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StudentLiveBeaconScreen(
+          enrollment: enrollment,
+          database: widget.database,
+        ),
+      ),
     );
   }
 
@@ -308,7 +311,7 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
           final enrollment = _enrollments[index];
           return _EnrollmentCard(
             enrollment: enrollment,
-            onMarkAttendance: () => _showBleAttendanceDialog(enrollment),
+            onMarkAttendance: () => _openLiveBeaconScreen(enrollment),
             onRemove: () => _confirmRemoveEnrollment(enrollment),
           );
         },
