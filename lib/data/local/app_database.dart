@@ -5,6 +5,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/attendance_record_model.dart';
 import '../../core/models/course_model.dart';
 import '../../core/models/session_model.dart';
+import '../../core/models/student_enrollment_model.dart';
 import '../../core/models/student_model.dart';
 
 /// Acceso local SQLite (Offline-First) del proyecto.
@@ -14,7 +15,7 @@ import '../../core/models/student_model.dart';
 /// junto con `inMemoryDatabasePath` para ejecutarse en Linux sin dispositivo.
 class AppDatabase {
   AppDatabase({DatabaseFactory? factory, String? databasePath})
-      : this._(factory, databasePath);
+    : this._(factory, databasePath);
 
   AppDatabase._(this._factory, this._databasePath);
 
@@ -25,6 +26,7 @@ class AppDatabase {
   static const String _studentsTable = 'students';
   static const String _sessionsTable = 'sessions';
   static const String _attendanceRecordsTable = 'attendance_records';
+  static const String _studentEnrollmentsTable = 'student_enrollments';
 
   final DatabaseFactory? _factory;
   final String? _databasePath;
@@ -46,7 +48,8 @@ class AppDatabase {
 
   Future<Database> _open() async {
     final factory = _factory ?? databaseFactory;
-    final path = _databasePath ??
+    final path =
+        _databasePath ??
         p.join(await factory.getDatabasesPath(), AppConstants.databaseName);
     return factory.openDatabase(
       path,
@@ -54,6 +57,7 @@ class AppDatabase {
         version: AppConstants.databaseVersion,
         onConfigure: _configure,
         onCreate: _createSchema,
+        onUpgrade: _upgradeSchema,
       ),
     );
   }
@@ -68,9 +72,20 @@ class AppDatabase {
     batch.execute(_createStudentsTable);
     batch.execute(_createSessionsTable);
     batch.execute(_createAttendanceRecordsTable);
+    batch.execute(_createStudentEnrollmentsTable);
     batch.execute(_createStudentsCourseIndex);
     batch.execute(_createAttendanceSessionIndex);
     await batch.commit(noResult: true);
+  }
+
+  static Future<void> _upgradeSchema(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    if (oldVersion < 2) {
+      await db.execute(_createStudentEnrollmentsTable);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -177,6 +192,63 @@ class AppDatabase {
       return null;
     }
     return StudentModel.fromMap(rows.first);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Credenciales de enrolamiento del estudiante
+  // ---------------------------------------------------------------------------
+
+  /// Guarda o reemplaza la credencial del estudiante para su curso.
+  ///
+  /// La tabla no depende de `courses` porque el teléfono del estudiante
+  /// conserva la credencial aunque no tenga el curso completo en su base local.
+  Future<void> upsertStudentEnrollment(
+    StudentEnrollmentModel enrollment,
+  ) async {
+    _validateBitIndex(enrollment.bitIndex);
+    final db = await database;
+    await db.insert(
+      _studentEnrollmentsTable,
+      enrollment.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Lista las credenciales guardadas, de la más reciente a la más antigua.
+  Future<List<StudentEnrollmentModel>> getStudentEnrollments() async {
+    final db = await database;
+    final rows = await db.query(
+      _studentEnrollmentsTable,
+      orderBy: 'enrolled_at_epoch_ms DESC, student_code ASC',
+    );
+    return rows.map(StudentEnrollmentModel.fromMap).toList(growable: false);
+  }
+
+  /// Recupera la credencial de un curso o `null` si aún no hay enrolamiento.
+  Future<StudentEnrollmentModel?> getStudentEnrollmentByCourse(
+    String courseId,
+  ) async {
+    final db = await database;
+    final rows = await db.query(
+      _studentEnrollmentsTable,
+      where: 'course_id = ?',
+      whereArgs: <Object?>[courseId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+    return StudentEnrollmentModel.fromMap(rows.first);
+  }
+
+  /// Elimina una credencial por su identificador local.
+  Future<void> deleteStudentEnrollment(String id) async {
+    final db = await database;
+    await db.delete(
+      _studentEnrollmentsTable,
+      where: 'id = ?',
+      whereArgs: <Object?>[id],
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -317,16 +389,14 @@ class AppDatabase {
   }
 
   static void _validateBitmapHex(String bitmapHex) {
-    final pattern = RegExp(
-      '^[0-9a-fA-F]{${AppConstants.bitmapHexLength}}\$',
-    );
+    final pattern = RegExp('^[0-9a-fA-F]{${AppConstants.bitmapHexLength}}\$');
     if (!pattern.hasMatch(bitmapHex)) {
       throw ArgumentError.value(
         bitmapHex,
         'bitmapHex',
         'El Bitmap debe ser hexadecimal de '
-        '${AppConstants.bitmapHexLength} caracteres '
-        '(${AppConstants.bitmapByteLength} bytes).',
+            '${AppConstants.bitmapHexLength} caracteres '
+            '(${AppConstants.bitmapByteLength} bytes).',
       );
     }
   }
@@ -346,7 +416,8 @@ class AppDatabase {
   // Esquema SQLite
   // ---------------------------------------------------------------------------
 
-  static const String _createCoursesTable = '''
+  static const String _createCoursesTable =
+      '''
     CREATE TABLE $_coursesTable (
       id TEXT PRIMARY KEY,
       code TEXT NOT NULL,
@@ -359,7 +430,8 @@ class AppDatabase {
     )
   ''';
 
-  static const String _createStudentsTable = '''
+  static const String _createStudentsTable =
+      '''
     CREATE TABLE $_studentsTable (
       id TEXT PRIMARY KEY,
       course_id TEXT NOT NULL,
@@ -376,7 +448,8 @@ class AppDatabase {
     )
   ''';
 
-  static const String _createSessionsTable = '''
+  static const String _createSessionsTable =
+      '''
     CREATE TABLE $_sessionsTable (
       id TEXT PRIMARY KEY,
       course_id TEXT NOT NULL,
@@ -391,7 +464,8 @@ class AppDatabase {
     )
   ''';
 
-  static const String _createAttendanceRecordsTable = '''
+  static const String _createAttendanceRecordsTable =
+      '''
     CREATE TABLE $_attendanceRecordsTable (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
@@ -410,11 +484,31 @@ class AppDatabase {
     )
   ''';
 
-  static const String _createStudentsCourseIndex = '''
+  static const String _createStudentEnrollmentsTable =
+      '''
+    CREATE TABLE IF NOT EXISTS $_studentEnrollmentsTable (
+      id TEXT PRIMARY KEY,
+      course_id TEXT NOT NULL UNIQUE,
+      course_code TEXT NOT NULL,
+      course_name TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      student_code TEXT NOT NULL,
+      full_name TEXT NOT NULL,
+      bit_index INTEGER NOT NULL
+        CHECK (bit_index >= 0 AND bit_index < ${AppConstants.bitmapBitCount}),
+      device_secret TEXT NOT NULL,
+      shared_secret TEXT NOT NULL,
+      enrolled_at_epoch_ms INTEGER NOT NULL
+    )
+  ''';
+
+  static const String _createStudentsCourseIndex =
+      '''
     CREATE INDEX idx_students_course_id ON $_studentsTable (course_id)
   ''';
 
-  static const String _createAttendanceSessionIndex = '''
+  static const String _createAttendanceSessionIndex =
+      '''
     CREATE INDEX idx_attendance_records_session_id
       ON $_attendanceRecordsTable (session_id)
   ''';
