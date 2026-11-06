@@ -13,6 +13,9 @@ abstract final class AppConstants {
   /// Ventana de rotación de la etiqueta HMAC-SHA256, en segundos.
   static const int hmacRotationSeconds = 30;
 
+  /// Alias de la ventana HMAC usado por el protocolo BLE de 16 bytes.
+  static const int hmacWindowSeconds = hmacRotationSeconds;
+
   /// Cantidad de posiciones del mapa de bits de asistencia (64 bits).
   static const int bitmapBitCount = 64;
 
@@ -31,6 +34,9 @@ abstract final class AppConstants {
   /// RSSI mínimo aceptado por defecto para considerar proximidad real (-75 dBm).
   static const int defaultMinRssi = -75;
 
+  /// Alias del umbral de proximidad usado por el escáner BLE.
+  static const int minRssiDbm = defaultMinRssi;
+
   /// Longitud del PIN verbal de la sesión (2 dígitos).
   static const int roomPinLength = 2;
 
@@ -44,5 +50,5 @@ abstract final class AppConstants {
   static const String databaseName = 'asistencia_uniguajira.db';
 
   /// Versión del esquema SQLite.
-  static const int databaseVersion = 1;
+  static const int databaseVersion = 2;
 }
