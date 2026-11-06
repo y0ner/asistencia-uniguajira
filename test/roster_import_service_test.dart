@@ -47,7 +47,8 @@ void main() {
   });
 
   group('CSV', () {
-    test('conserva ceros, normaliza nombres y aplica las dos deduplicaciones',
+    test(
+        'importFromCsvString con encabezados conserva ceros a la izquierda y asigna bitmapIndex 0 y 1',
         () async {
       final course = _course();
       await database.insertCourse(course);
@@ -75,6 +76,10 @@ void main() {
         result.insertedStudents.map((StudentModel student) => student.bitIndex),
         <int>[0, 1],
       );
+      expect(result.insertedStudents[0].studentCode, '0182120016');
+      expect(result.insertedStudents[0].bitIndex, 0);
+      expect(result.insertedStudents[1].studentCode, '0182110072');
+      expect(result.insertedStudents[1].bitIndex, 1);
       expect(result.insertedStudents.first.email, 'jose@uniguajira.edu.co');
       expect(result.insertedStudents.last.email, isNull);
       expect(
@@ -83,15 +88,42 @@ void main() {
         isTrue,
       );
 
+      // Verificación de persistencia real en SQLite
+      final dbStudents = await database.getStudentsByCourse(course.id);
+      expect(dbStudents, hasLength(2));
+      expect(dbStudents[0].studentCode, '0182120016');
+      expect(dbStudents[0].bitIndex, 0);
+      expect(dbStudents[1].studentCode, '0182110072');
+      expect(dbStudents[1].bitIndex, 1);
+
+      // Reimportar el mismo lote no duplica registros en SQLite
       final again = await service.importFromCsvString(course.id, csv);
       expect(again.insertedCount, 0);
       expect(again.duplicatesSkipped, 4);
       expect(again.invalidRowsSkipped, 1);
       expect(await database.getStudentsByCourse(course.id), hasLength(2));
     });
+
+    test('soporta delimitador punto y coma y encabezados alternativos', () async {
+      final course = _course();
+      await database.insertCourse(course);
+      const csv = 'codigo estudiante;nombre completo;email\n'
+          '0182120016;Álvaro Luis Garrido Medina;alvaro@uniguajira.edu.co\n'
+          '0182110072;María Camila Ipuana;maria@uniguajira.edu.co\n';
+
+      final result = await service.importFromCsvString(course.id, csv);
+
+      expect(result.insertedCount, 2);
+      expect(result.duplicatesSkipped, 0);
+      expect(result.invalidRowsSkipped, 0);
+      expect(result.insertedStudents[0].studentCode, '0182120016');
+      expect(result.insertedStudents[0].bitIndex, 0);
+      expect(result.insertedStudents[1].studentCode, '0182110072');
+      expect(result.insertedStudents[1].bitIndex, 1);
+    });
   });
 
-  group('portapapeles', () {
+  group('portapapeles y deduplicación', () {
     test('acepta tabulador, punto y coma, coma y guion como separadores',
         () async {
       final course = _course();
@@ -123,10 +155,78 @@ void main() {
         <int>[0, 1, 2, 3, 4],
       );
     });
+
+    test(
+        'deduplica automáticamente filas repetidas y nombres con tildes ("Álvaro Luis Garrido Medina" vs "ALVARO LUIS GARRIDO MEDINA") incrementando duplicatesSkipped sin duplicar en SQLite',
+        () async {
+      final course = _course();
+      await database.insertCourse(course);
+
+      // Ingesta inicial por portapapeles con nombre con tilde
+      const primerLote = '0182120016\tÁlvaro Luis Garrido Medina\n'
+          '0182110072\tMaría Camila Ipuana\n';
+
+      final res1 = await service.importFromClipboardText(course.id, primerLote);
+      expect(res1.insertedCount, 2);
+      expect(res1.duplicatesSkipped, 0);
+      expect(res1.invalidRowsSkipped, 0);
+      expect(res1.insertedStudents[0].studentCode, '0182120016');
+      expect(res1.insertedStudents[0].bitIndex, 0);
+      expect(res1.insertedStudents[0].fullName, 'ALVARO LUIS GARRIDO MEDINA');
+      expect(res1.insertedStudents[1].studentCode, '0182110072');
+      expect(res1.insertedStudents[1].bitIndex, 1);
+
+      // Segundo pegado que incluye:
+      // 1. Fila repetida exacta (código y nombre existente)
+      // 2. Colisión por nombre en mayúsculas sin tilde pero con otro código ("0182120099\tALVARO LUIS GARRIDO MEDINA")
+      // 3. Colisión por código pero con otro nombre ("0182110072\tMaria Diferente")
+      // 4. Un estudiante nuevo válido ("0182120050\tJosé Pérez")
+      // 5. Duplicado intra-lote del nuevo (mismo nombre sin tilde: "0182120051\tJOSE PEREZ")
+      // 6. Duplicado intra-lote exacto ("0182120050\tJosé Pérez")
+      const segundoLote =
+          '0182120016\tÁlvaro Luis Garrido Medina\n'
+          '0182120099\tALVARO LUIS GARRIDO MEDINA\n'
+          '0182110072\tMaria Diferente\n'
+          '0182120050\tJosé Pérez\n'
+          '0182120051\tJOSE PEREZ\n'
+          '0182120050\tJosé Pérez\n';
+
+      final res2 = await service.importFromClipboardText(course.id, segundoLote);
+
+      // Solo '0182120050' / 'José Pérez' debe haber sido insertado
+      expect(res2.insertedCount, 1);
+      expect(res2.duplicatesSkipped, 5);
+      expect(res2.invalidRowsSkipped, 0);
+      expect(res2.insertedStudents.single.studentCode, '0182120050');
+      expect(res2.insertedStudents.single.fullName, 'JOSE PEREZ');
+      expect(res2.insertedStudents.single.bitIndex, 2);
+
+      // Verificación estricta en SQLite: no deben existir registros duplicados
+      final estudiantesEnDb = await database.getStudentsByCourse(course.id);
+      expect(estudiantesEnDb, hasLength(3));
+      expect(
+        estudiantesEnDb.map((s) => s.studentCode).toList(),
+        <String>['0182120016', '0182110072', '0182120050'],
+      );
+      expect(
+        estudiantesEnDb.map((s) => s.fullName).toList(),
+        <String>[
+          'ALVARO LUIS GARRIDO MEDINA',
+          'MARIA CAMILA IPUANA',
+          'JOSE PEREZ',
+        ],
+      );
+      expect(
+        estudiantesEnDb.map((s) => s.bitIndex).toList(),
+        <int>[0, 1, 2],
+      );
+    });
   });
 
   group('Excel', () {
-    test('lee .xlsx preservando códigos como texto', () async {
+    test(
+        'importFromExcelBytes lee .xlsx generado en memoria preservando códigos y asignando bitmapIndex',
+        () async {
       final course = _course();
       await database.insertCourse(course);
       final workbook = Excel.createExcel();
@@ -152,11 +252,57 @@ void main() {
       final result = await service.importFromExcelBytes(course.id, bytes!);
 
       expect(result.insertedCount, 2);
+      expect(result.duplicatesSkipped, 0);
+      expect(result.invalidRowsSkipped, 0);
       expect(
         result.insertedStudents.map((StudentModel student) => student.studentCode),
         <String>['0182120016', '0182110072'],
       );
+      expect(result.insertedStudents[0].bitIndex, 0);
+      expect(result.insertedStudents[1].bitIndex, 1);
       expect(result.insertedStudents.first.fullName, 'JOSE ANGEL PEREZ');
+      expect(result.insertedStudents.first.email, 'jose@uniguajira.edu.co');
+      expect(result.insertedStudents.last.email, isNull);
+
+      // Verificación en SQLite
+      final dbStudents = await database.getStudentsByCourse(course.id);
+      expect(dbStudents, hasLength(2));
+      expect(dbStudents[0].studentCode, '0182120016');
+      expect(dbStudents[0].bitIndex, 0);
+      expect(dbStudents[1].studentCode, '0182110072');
+      expect(dbStudents[1].bitIndex, 1);
+    });
+
+    test('descarta duplicados en Excel y rechaza libro sin datos', () async {
+      final course = _course();
+      await database.insertCourse(course);
+      final workbook = Excel.createExcel();
+      final sheet = workbook['Sheet1'];
+      sheet.appendRow(<CellValue>[
+        TextCellValue('Código'),
+        TextCellValue('Nombre'),
+      ]);
+      sheet.appendRow(<CellValue>[
+        TextCellValue('0182120016'),
+        TextCellValue('Estudiante Uno'),
+      ]);
+      sheet.appendRow(<CellValue>[
+        TextCellValue('0182120016'),
+        TextCellValue('Estudiante Dos'),
+      ]);
+
+      final bytes = workbook.encode()!;
+      final result = await service.importFromExcelBytes(course.id, bytes);
+      expect(result.insertedCount, 1);
+      expect(result.duplicatesSkipped, 1);
+
+      // Libro sin filas con datos arroja ArgumentError
+      final emptyWorkbook = Excel.createExcel();
+      final emptyBytes = emptyWorkbook.encode()!;
+      expect(
+        () => service.importFromExcelBytes(course.id, emptyBytes),
+        throwsA(isA<ArgumentError>()),
+      );
     });
   });
 
@@ -234,8 +380,10 @@ void main() {
     });
   });
 
-  group('QR y cursos', () {
-    test('genera el payload compacto de enrolamiento', () {
+  group('QR y enrolamiento', () {
+    test(
+        'generateEnrollmentQrPayload genera JSON válido con bitmapIndex, studentCode y semillas criptográficas',
+        () {
       const course = CourseModel(
         id: 'course-1',
         code: 'ING-101',
@@ -249,7 +397,7 @@ void main() {
         id: 'student-1',
         courseId: 'course-1',
         studentCode: '0182120016',
-        fullName: 'JOSE ANGEL PEREZ',
+        fullName: 'ALVARO LUIS GARRIDO MEDINA',
         bitIndex: 7,
         personalSecret: _personalSecret,
       );
@@ -258,6 +406,9 @@ void main() {
         course: course,
         student: student,
       );
+
+      expect(payload.contains('\n'), isFalse);
+
       final decoded = jsonDecode(payload) as Map<String, dynamic>;
 
       expect(decoded['courseId'], 'course-1');
@@ -265,11 +416,48 @@ void main() {
       expect(decoded['courseName'], 'Introducción a la Ingeniería');
       expect(decoded['studentId'], 'student-1');
       expect(decoded['studentCode'], '0182120016');
-      expect(decoded['fullName'], 'JOSE ANGEL PEREZ');
+      expect(decoded['fullName'], 'ALVARO LUIS GARRIDO MEDINA');
       expect(decoded['bitmapIndex'], 7);
       expect(decoded['deviceSecret'], _personalSecret);
       expect(decoded['sharedSecret'], _courseSecret);
-      expect(payload.contains('\n'), isFalse);
+
+      // Verificación de semillas criptográficas (64 hex characters / 256 bits)
+      expect(
+        RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(decoded['deviceSecret'] as String),
+        isTrue,
+      );
+      expect(
+        RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(decoded['sharedSecret'] as String),
+        isTrue,
+      );
+    });
+
+    test('generateEnrollmentQrPayload rechaza estudiante de otro curso', () {
+      const course = CourseModel(
+        id: 'course-1',
+        code: 'ING-101',
+        name: 'Introducción a la Ingeniería',
+        groupCode: '01',
+        semester: '2026-2',
+        courseSecret: _courseSecret,
+        createdAt: '2026-11-06T08:00:00.000-05:00',
+      );
+      const studentOtroCurso = StudentModel(
+        id: 'student-99',
+        courseId: 'course-OTRO',
+        studentCode: '0182120099',
+        fullName: 'ESTUDIANTE AJENO',
+        bitIndex: 3,
+        personalSecret: _personalSecret,
+      );
+
+      expect(
+        () => service.generateEnrollmentQrPayload(
+          course: course,
+          student: studentOtroCurso,
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('getCourses y deleteCourse eliminan el curso en cascada', () async {
