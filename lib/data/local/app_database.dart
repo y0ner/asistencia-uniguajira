@@ -105,6 +105,23 @@ class AppDatabase {
     return rows.map(CourseModel.fromMap).toList(growable: false);
   }
 
+  /// Lista todos los cursos para las capas de selección e importación.
+  ///
+  /// Se expone con el nombre corto solicitado por el motor de roster; delega
+  /// en [getAllCourses] para conservar un único orden y contrato.
+  Future<List<CourseModel>> getCourses() => getAllCourses();
+
+  /// Elimina un curso y, por las claves foráneas en cascada, su roster,
+  /// sus sesiones y los registros de asistencia asociados.
+  Future<void> deleteCourse(String courseId) async {
+    final db = await database;
+    await db.delete(
+      _coursesTable,
+      where: 'id = ?',
+      whereArgs: <Object?>[courseId],
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Estudiantes
   // ---------------------------------------------------------------------------
