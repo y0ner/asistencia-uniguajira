@@ -535,7 +535,7 @@ void main() {
       expect(_extractCellString(rowYoner[6]), '0'); // 0 Manual
       expect(_extractCellString(rowYoner[7]), '4');
       expect(_extractCellString(rowYoner[8]), '0');
-      expect(_extractCellString(rowYoner[9]), '100.0');
+      expect(double.tryParse(_extractCellString(rowYoner[9])), 100.0);
       expect(_extractCellString(rowYoner[10]), 'NORMAL');
 
       // Verificación de celda de texto para Álvaro
@@ -550,7 +550,7 @@ void main() {
       expect(_extractCellString(rowAlvaro[6]), '2'); // 2 Manual
       expect(_extractCellString(rowAlvaro[7]), '4');
       expect(_extractCellString(rowAlvaro[8]), '0');
-      expect(_extractCellString(rowAlvaro[9]), '100.0');
+      expect(double.tryParse(_extractCellString(rowAlvaro[9])), 100.0);
       expect(_extractCellString(rowAlvaro[10]), 'NORMAL');
 
       // ---------------------------------------------------------------------
@@ -569,11 +569,11 @@ void main() {
         detailHeaders,
         containsAll(<String>[
           'SesionID',
-          'FechaSesion',
+          'FechaApertura',
           'CodigoEstudiantil',
           'NombreCompleto',
-          'Estado',
-          'Metodo',
+          'EstadoAsistencia',
+          'MetodoRegistro',
         ]),
       );
 
