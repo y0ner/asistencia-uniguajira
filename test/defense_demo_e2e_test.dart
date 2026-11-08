@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:asistencia_uniguajira/core/constants/app_constants.dart';
 import 'package:asistencia_uniguajira/core/crypto/ble_packet_codec.dart';
-import 'package:asistencia_uniguajira/core/models/attendance_record_model.dart';
 import 'package:asistencia_uniguajira/core/models/course_model.dart';
 import 'package:asistencia_uniguajira/core/models/session_model.dart';
 import 'package:asistencia_uniguajira/core/models/student_model.dart';

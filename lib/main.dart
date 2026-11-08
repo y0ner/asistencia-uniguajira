@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'core/constants/app_constants.dart';
-import 'core/models/course_model.dart';
 import 'data/services/demo_seed_service.dart';
 import 'features/student/student_courses_screen.dart';
 import 'features/teacher/course_detail_screen.dart';
