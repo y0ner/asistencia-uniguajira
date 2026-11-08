@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "co.edu.uniguajira.asistencia_uniguajira"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
