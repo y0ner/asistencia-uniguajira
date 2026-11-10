@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../data/services/attendance_session_controller.dart';
+import '../../theme/theme.dart';
 
 /// Diálogo modal con el Acta Criptográfica de Sesión Firmada (HMAC-SHA256).
 ///
@@ -89,13 +90,14 @@ class SignedActaDialog extends StatelessWidget {
   }
 
   void _copyToClipboard(BuildContext context) {
+    final colors = AppColors.of(context);
     final prettyJson = const JsonEncoder.withIndent('  ').convert(acta.toJson());
     Clipboard.setData(ClipboardData(text: prettyJson));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Acta criptográfica copiada al portapapeles en formato JSON.'),
-        backgroundColor: Color(0xFF0033A0),
-        duration: Duration(seconds: 3),
+      SnackBar(
+        content: const Text('Acta criptográfica copiada al portapapeles en formato JSON.'),
+        backgroundColor: colors.primary,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -103,6 +105,10 @@ class SignedActaDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final totalPresent = acta.presentBleCount + acta.presentManualCount;
     final double attendancePercent = acta.totalEnrolled == 0
         ? 0.0
@@ -113,51 +119,51 @@ class SignedActaDialog extends StatelessWidget {
         : null;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      shape: radii.dialogShape(),
+      insetPadding: spacing.symmetric(horizontal: spacing.md, vertical: spacing.lg),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 600, maxHeight: 720),
         child: Column(
           children: <Widget>[
             // Cabecera institucional del Acta
             Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Color(0xFF0033A0),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              padding: spacing.insetsCard,
+              decoration: BoxDecoration(
+                color: colors.primary,
+                borderRadius: radii.borderTopXl,
               ),
               child: Row(
                 children: <Widget>[
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: spacing.insetsXs,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
+                      color: colors.onPrimary.withValues(alpha: 0.15),
+                      borderRadius: radii.borderMd,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.verified_user_rounded,
-                      color: Colors.white,
+                      color: colors.onPrimary,
                       size: 28,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  SizedBox(width: spacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        const Text(
+                        Text(
                           'Acta Criptográfica de Sesión',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: colors.onPrimary,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        SizedBox(height: spacing.xxs / 2),
                         Text(
                           '${acta.courseName} (${acta.courseCode})',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
+                            color: colors.onPrimary.withValues(alpha: 0.85),
                             fontSize: 13,
                           ),
                           maxLines: 1,
@@ -167,18 +173,18 @@ class SignedActaDialog extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+                    padding: spacing.symmetric(
+                      horizontal: spacing.xs,
+                      vertical: spacing.xxs,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
+                      color: colors.onPrimary.withValues(alpha: 0.2),
+                      borderRadius: radii.borderSm,
                     ),
                     child: Text(
                       'PIN: ${acta.sessionPin}',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colors.onPrimary,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'monospace',
                         fontSize: 13,
@@ -192,34 +198,35 @@ class SignedActaDialog extends StatelessWidget {
             // Cuerpo del Acta
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: spacing.insetsCard,
                 children: <Widget>[
                   // Resumen de Métricas
-                  _buildMetricsRow(theme, totalPresent, attendancePercent),
-                  const SizedBox(height: 16),
+                  _buildMetricsRow(context, totalPresent, attendancePercent),
+                  SizedBox(height: spacing.md),
 
                   // Caja de Seguridad y Firma Criptográfica
-                  _buildCryptoCard(theme, isSignatureValid),
-                  const SizedBox(height: 16),
+                  _buildCryptoCard(context, isSignatureValid),
+                  SizedBox(height: spacing.md),
 
                   // Título de la lista de asistencia
                   Row(
                     children: <Widget>[
-                      const Icon(Icons.people_alt_outlined, size: 20),
-                      const SizedBox(width: 8),
+                      Icon(Icons.people_alt_outlined, size: 20, color: colors.onSurface),
+                      SizedBox(width: spacing.xs),
                       Text(
                         'Roster Oficial de la Sesión (${acta.records.length})',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: colors.onSurface,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: spacing.xs),
 
                   // Lista de estudiantes del acta
                   ...acta.records.map((SessionActaRecord record) {
-                    return _buildStudentRecordTile(theme, record);
+                    return _buildStudentRecordTile(context, record);
                   }),
                 ],
               ),
@@ -227,14 +234,13 @@ class SignedActaDialog extends StatelessWidget {
 
             // Barra inferior con acciones
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: spacing.insetsCard,
               decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius:
-                    const BorderRadius.vertical(bottom: Radius.circular(20)),
+                color: colors.surfaceContainer,
+                borderRadius: BorderRadius.vertical(bottom: radii.radiusXl),
                 border: Border(
                   top: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    color: colors.outlineVariant,
                   ),
                 ),
               ),
@@ -249,11 +255,13 @@ class SignedActaDialog extends StatelessWidget {
                   FilledButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0033A0),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                      padding: spacing.symmetric(
+                        horizontal: spacing.lg,
+                        vertical: spacing.sm,
                       ),
+                      shape: radii.buttonShape(),
                     ),
                     child: const Text('Aceptar'),
                   ),
@@ -267,17 +275,22 @@ class SignedActaDialog extends StatelessWidget {
   }
 
   Widget _buildMetricsRow(
-    ThemeData theme,
+    BuildContext context,
     int totalPresent,
     double attendancePercent,
   ) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: spacing.insetsSm,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
+        color: colors.surfaceContainerHigh,
+        borderRadius: radii.borderMd,
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+          color: colors.outlineVariant,
         ),
       ),
       child: Column(
@@ -286,32 +299,36 @@ class SignedActaDialog extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: <Widget>[
               _buildMetricItem(
+                context: context,
                 label: 'Presentes BLE',
                 value: '${acta.presentBleCount}',
-                color: Colors.green.shade700,
+                color: colors.statusNormal,
                 icon: Icons.bluetooth_connected,
               ),
               _buildMetricItem(
+                context: context,
                 label: 'Manual',
                 value: '${acta.presentManualCount}',
-                color: Colors.orange.shade800,
+                color: colors.manualAccent,
                 icon: Icons.touch_app,
               ),
               _buildMetricItem(
+                context: context,
                 label: 'Ausentes',
                 value: '${acta.absentCount}',
-                color: Colors.red.shade700,
+                color: colors.statusPerdida,
                 icon: Icons.person_off,
               ),
               _buildMetricItem(
+                context: context,
                 label: 'Asistencia',
                 value: '${attendancePercent.toStringAsFixed(0)}%',
-                color: const Color(0xFF0033A0),
+                color: colors.primary,
                 icon: Icons.pie_chart,
               ),
             ],
           ),
-          const Divider(height: 20),
+          Divider(height: spacing.lg),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Widget>[
@@ -319,12 +336,13 @@ class SignedActaDialog extends StatelessWidget {
                 'Total Matriculados: ${acta.totalEnrolled}',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: colors.onSurface,
                 ),
               ),
               Text(
                 'Presentes: $totalPresent / ${acta.totalEnrolled}',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: totalPresent > 0 ? Colors.green.shade800 : null,
+                  color: totalPresent > 0 ? colors.statusNormal : colors.onSurfaceMuted,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -336,15 +354,19 @@ class SignedActaDialog extends StatelessWidget {
   }
 
   Widget _buildMetricItem({
+    required BuildContext context,
     required String label,
     required String value,
     required Color color,
     required IconData icon,
   }) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+
     return Column(
       children: <Widget>[
         Icon(icon, color: color, size: 20),
-        const SizedBox(height: 4),
+        SizedBox(height: spacing.xxs),
         Text(
           value,
           style: TextStyle(
@@ -357,20 +379,24 @@ class SignedActaDialog extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 11,
-            color: Colors.grey.shade700,
+            color: colors.onSurfaceMuted,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildCryptoCard(ThemeData theme, bool? isSignatureValid) {
+  Widget _buildCryptoCard(BuildContext context, bool? isSignatureValid) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: spacing.insetsSm,
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
+        color: colors.surfaceContainerLow,
+        borderRadius: radii.borderMd,
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,25 +406,29 @@ class SignedActaDialog extends StatelessWidget {
               Icon(
                 Icons.lock_outline,
                 size: 18,
-                color: theme.colorScheme.primary,
+                color: colors.primary,
               ),
-              const SizedBox(width: 6),
-              const Text(
+              SizedBox(width: spacing.xxs + 2),
+              Text(
                 'Sello Digital y Firma Inmutable',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: colors.onSurface,
+                ),
               ),
               const Spacer(),
               if (isSignatureValid != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
+                  padding: spacing.symmetric(
+                    horizontal: spacing.xxs + 2,
+                    vertical: spacing.xxs / 2,
                   ),
                   decoration: BoxDecoration(
                     color: isSignatureValid
-                        ? Colors.green.shade100
-                        : Colors.red.shade100,
-                    borderRadius: BorderRadius.circular(6),
+                        ? colors.statusNormalContainer
+                        : colors.statusPerdidaContainer,
+                    borderRadius: radii.borderXs,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -407,18 +437,18 @@ class SignedActaDialog extends StatelessWidget {
                         isSignatureValid ? Icons.check_circle : Icons.error,
                         size: 12,
                         color: isSignatureValid
-                            ? Colors.green.shade800
-                            : Colors.red.shade800,
+                            ? colors.onStatusNormalContainer
+                            : colors.onStatusPerdidaContainer,
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: spacing.xxs),
                       Text(
                         isSignatureValid ? 'VÁLIDA' : 'INVÁLIDA',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: isSignatureValid
-                              ? Colors.green.shade800
-                              : Colors.red.shade800,
+                              ? colors.onStatusNormalContainer
+                              : colors.onStatusPerdidaContainer,
                         ),
                       ),
                     ],
@@ -426,46 +456,55 @@ class SignedActaDialog extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: spacing.xs),
           Row(
             children: <Widget>[
-              const Text(
+              Text(
                 'Bitmap Final: ',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: colors.onSurfaceMuted,
+                ),
               ),
               Expanded(
                 child: Text(
                   '0x${acta.bitmapHex}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'monospace',
                     fontSize: 11,
                     letterSpacing: 0.5,
+                    color: colors.onSurface,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          const Text(
+          SizedBox(height: spacing.xxs),
+          Text(
             'Firma HMAC-SHA256:',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: colors.onSurfaceMuted,
+            ),
           ),
           Container(
             width: double.infinity,
-            margin: const EdgeInsets.only(top: 2),
-            padding: const EdgeInsets.all(6),
+            margin: spacing.only(top: spacing.xxs / 2),
+            padding: spacing.all(spacing.xxs + 2),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Colors.grey.shade300),
+              color: colors.surfaceContainer,
+              borderRadius: radii.borderXs,
+              border: Border.all(color: colors.outlineVariant),
             ),
             child: SelectableText(
               acta.actaHmacSignature,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 10,
-                color: Colors.black87,
+                color: colors.onSurface,
               ),
             ),
           ),
@@ -475,57 +514,61 @@ class SignedActaDialog extends StatelessWidget {
   }
 
   Widget _buildStudentRecordTile(
-    ThemeData theme,
+    BuildContext context,
     SessionActaRecord record,
   ) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final isPresent = record.isPresent;
     final isBle = record.method == AppConstants.attendanceMethodBleHmac;
     final bitStr = record.bitIndex.toString().padLeft(2, '0');
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: spacing.only(bottom: spacing.xxs + 2),
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+      shape: radii.cardShape(
         side: BorderSide(
           color: isPresent
-              ? Colors.green.shade200
-              : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ? colors.statusNormal.withValues(alpha: 0.4)
+              : colors.outlineVariant,
         ),
       ),
-      color: isPresent ? Colors.green.shade50.withValues(alpha: 0.5) : null,
+      color: isPresent ? colors.statusNormalContainer.withValues(alpha: 0.4) : null,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xs),
         child: Row(
           children: <Widget>[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              padding: spacing.symmetric(horizontal: spacing.xxs + 2, vertical: spacing.xxs / 2),
               decoration: BoxDecoration(
                 color: isPresent
-                    ? Colors.green.shade600
-                    : Colors.grey.shade400,
-                borderRadius: BorderRadius.circular(6),
+                    ? colors.statusNormal
+                    : colors.outline,
+                borderRadius: radii.borderXs,
               ),
               child: Text(
                 '#$bitStr',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isPresent ? colors.onStatusNormal : colors.surface,
                   fontFamily: 'monospace',
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: spacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
                     record.fullName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
+                      color: colors.onSurface,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -535,7 +578,7 @@ class SignedActaDialog extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 11,
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: colors.onSurfaceMuted,
                     ),
                   ),
                 ],
@@ -546,15 +589,15 @@ class SignedActaDialog extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: <Widget>[
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
+                    padding: spacing.symmetric(
+                      horizontal: spacing.xxs + 2,
+                      vertical: spacing.xxs / 2,
                     ),
                     decoration: BoxDecoration(
                       color: isBle
-                          ? Colors.green.shade100
-                          : Colors.orange.shade100,
-                      borderRadius: BorderRadius.circular(6),
+                          ? colors.bleAccentContainer
+                          : colors.manualAccentContainer,
+                      borderRadius: radii.borderXs,
                     ),
                     child: Text(
                       isBle ? 'BLE' : 'MANUAL',
@@ -562,20 +605,21 @@ class SignedActaDialog extends StatelessWidget {
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         color: isBle
-                            ? Colors.green.shade800
-                            : Colors.orange.shade900,
+                            ? colors.onBleAccentContainer
+                            : colors.onManualAccentContainer,
                       ),
                     ),
                   ),
                   if (record.verifyCode != null)
                     Padding(
-                      padding: const EdgeInsets.only(top: 2),
+                      padding: spacing.only(top: spacing.xxs / 2),
                       child: Text(
                         record.verifyCode!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
+                          color: colors.onSurfaceMuted,
                         ),
                       ),
                     ),
@@ -583,20 +627,20 @@ class SignedActaDialog extends StatelessWidget {
               )
             else
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 2,
+                padding: spacing.symmetric(
+                  horizontal: spacing.xxs + 2,
+                  vertical: spacing.xxs / 2,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(6),
+                  color: colors.surfaceContainerHigh,
+                  borderRadius: radii.borderXs,
                 ),
                 child: Text(
                   'AUSENTE',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade700,
+                    color: colors.onSurfaceMuted,
                   ),
                 ),
               ),

@@ -12,6 +12,7 @@ import '../../core/models/session_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/cloud_sync_service.dart';
 import '../../data/services/excel_report_service.dart';
+import '../../theme/theme.dart';
 import 'live_attendance_session_screen.dart';
 import 'signed_acta_dialog.dart';
 
@@ -51,9 +52,6 @@ class CourseReportsScreen extends StatefulWidget {
 }
 
 class _CourseReportsScreenState extends State<CourseReportsScreen> {
-  static const Color _uniguajiraBlue = Color(0xFF0033A0);
-  static const Color _uniguajiraGold = Color(0xFFEAAA00);
-
   late final AppDatabase _database;
   late final ExcelReportService _excelService;
   late final CloudSyncService _cloudSyncService;
@@ -185,11 +183,12 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      final colors = AppColors.of(context);
       setState(() => _isExporting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al exportar libro Excel: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: colors.statusPerdida,
           duration: const Duration(seconds: 4),
         ),
       );
@@ -201,6 +200,10 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     required int fileSizeBytes,
     required String hmacSha256,
   }) async {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final fileName = p.basename(filePath);
     final sizeKb = (fileSizeBytes / 1024).toStringAsFixed(1);
 
@@ -208,24 +211,22 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
       context: context,
       builder: (BuildContext ctx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+          shape: radii.dialogShape(),
           title: Row(
             children: <Widget>[
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: spacing.insetsXs,
                 decoration: BoxDecoration(
-                  color: Colors.green.shade100,
-                  borderRadius: BorderRadius.circular(10),
+                  color: colors.statusNormalContainer,
+                  borderRadius: radii.borderSm,
                 ),
                 child: Icon(
                   Icons.table_view_rounded,
-                  color: Colors.green.shade800,
+                  color: colors.statusNormal,
                   size: 26,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: spacing.sm),
               const Expanded(
                 child: Text(
                   'Excel Oficial Generado',
@@ -242,27 +243,27 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                 Text(
                   'El libro oficial de 4 hojas reglamentarias (Resumen, Detalle, '
                   'Sesiones y Metadatos) fue generado y firmado exitosamente.',
-                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                  style: TextStyle(color: colors.onSurfaceMuted, fontSize: 13),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: spacing.md),
                 _buildInfoRow('Archivo:', fileName, isBold: true),
-                const SizedBox(height: 6),
+                SizedBox(height: spacing.xxs),
                 _buildInfoRow('Tamaño:', '$fileSizeBytes bytes ($sizeKb KB)'),
-                const SizedBox(height: 6),
+                SizedBox(height: spacing.xxs),
                 _buildInfoRow('Hojas:', '4 (Resumen, Detalle, Sesiones, Metadatos)'),
-                const SizedBox(height: 12),
-                const Text(
+                SizedBox(height: spacing.sm),
+                Text(
                   'Ruta en almacenamiento:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.onSurface),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: spacing.xxs),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(10),
+                  padding: spacing.insetsSm,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
+                    color: colors.surfaceContainerLow,
+                    borderRadius: radii.borderSm,
+                    border: Border.all(color: colors.outlineVariant),
                   ),
                   child: SelectableText(
                     filePath,
@@ -272,26 +273,26 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                const Text(
+                SizedBox(height: spacing.sm),
+                Text(
                   'Huella HMAC-SHA256 del reporte:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.onSurface),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: spacing.xxs),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(10),
+                  padding: spacing.insetsSm,
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
+                    color: colors.primaryContainer,
+                    borderRadius: radii.borderSm,
+                    border: Border.all(color: colors.primary.withValues(alpha: 0.3)),
                   ),
                   child: SelectableText(
                     hmacSha256,
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 11,
-                      color: Colors.blue.shade900,
+                      color: colors.onPrimaryContainer,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -316,7 +317,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(),
               style: FilledButton.styleFrom(
-                backgroundColor: _uniguajiraBlue,
+                backgroundColor: colors.primary,
               ),
               child: const Text('Aceptar'),
             ),
@@ -327,6 +328,8 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
   }
 
   Widget _buildInfoRow(String label, String value, {bool isBold = false}) {
+    final colors = AppColors.of(context);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -336,7 +339,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade600,
+              color: colors.onSurfaceMuted,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -347,6 +350,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: colors.onSurface,
             ),
           ),
         ),
@@ -359,6 +363,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
       return;
     }
 
+    final colors = AppColors.of(context);
     final email = _institutionalEmailController.text.trim();
     setState(() => _isSyncing = true);
 
@@ -382,7 +387,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                 : 'Paquete de 4 hojas listo para exportación institucional offline.',
           ),
           backgroundColor:
-              result.isSuccess ? Colors.green.shade800 : Colors.orange.shade800,
+              result.isSuccess ? colors.statusNormal : colors.statusAlerta,
           duration: const Duration(seconds: 4),
         ),
       );
@@ -392,7 +397,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Fallo en sincronización institucional: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: colors.statusPerdida,
           duration: const Duration(seconds: 4),
         ),
       );
@@ -494,6 +499,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
 
     return DefaultTabController(
       length: 3,
@@ -508,12 +514,10 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
               ),
               Text(
                 '${widget.course.name} • Gr. ${widget.course.groupCode} • Sem. ${widget.course.semester}',
-                style: const TextStyle(fontSize: 12, color: Colors.white70),
+                style: TextStyle(fontSize: 12, color: colors.onSurfaceMuted),
               ),
             ],
           ),
-          backgroundColor: _uniguajiraBlue,
-          foregroundColor: Colors.white,
           actions: <Widget>[
             IconButton(
               icon: const Icon(Icons.refresh),
@@ -521,12 +525,12 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
               onPressed: _loadReportData,
             ),
           ],
-          bottom: const TabBar(
-            indicatorColor: _uniguajiraGold,
-            indicatorWeight: 3.5,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: <Widget>[
+          bottom: TabBar(
+            indicatorColor: colors.primary,
+            indicatorWeight: 3.0,
+            labelColor: colors.primary,
+            unselectedLabelColor: colors.onSurfaceMuted,
+            tabs: const <Widget>[
               Tab(
                 icon: Icon(Icons.people_alt_outlined),
                 text: 'Resumen Estudiantes',
@@ -553,32 +557,35 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
   }
 
   Widget _buildErrorView(ThemeData theme, String error) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: spacing.insetsLg,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.error_outline, size: 56, color: theme.colorScheme.error),
-            const SizedBox(height: 16),
+            Icon(Icons.error_outline, size: 56, color: colors.statusPerdida),
+            SizedBox(height: spacing.md),
             Text(
               'Error al compilar reporte del curso',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             Text(
               error,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+              style: TextStyle(color: colors.onSurfaceMuted, fontSize: 13),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: spacing.lg),
             FilledButton.icon(
               onPressed: _loadReportData,
               icon: const Icon(Icons.refresh),
               label: const Text('Reintentar'),
-              style: FilledButton.styleFrom(backgroundColor: _uniguajiraBlue),
+              style: FilledButton.styleFrom(backgroundColor: colors.primary),
             ),
           ],
         ),
@@ -640,12 +647,16 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     required int signedActas,
     required String reportHmac,
   }) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+        color: colors.surfaceContainerLow,
+        border: Border(bottom: BorderSide(color: colors.outlineVariant)),
       ),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      padding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xs + 2),
       child: Column(
         children: <Widget>[
           Row(
@@ -653,17 +664,17 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
               Expanded(
                 child: _buildMetricTile(
                   icon: Icons.event_available_rounded,
-                  iconColor: Colors.blue.shade700,
+                  iconColor: colors.bleAccent,
                   value: '$totalClosedSessions',
                   label: 'Sesiones Cerradas',
                   sublabel: 'de $totalSessions creadas',
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: spacing.xs),
               Expanded(
                 child: _buildMetricTile(
                   icon: Icons.insights_rounded,
-                  iconColor: avgAttendance >= 80 ? Colors.green.shade700 : Colors.orange.shade700,
+                  iconColor: avgAttendance >= 80 ? colors.statusNormal : colors.statusAlerta,
                   value: '$avgAttendance%',
                   label: 'Asistencia Global',
                   sublabel: 'promedio del curso',
@@ -671,23 +682,23 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: spacing.xs),
           Row(
             children: <Widget>[
               Expanded(
                 child: _buildMetricTile(
                   icon: Icons.warning_amber_rounded,
-                  iconColor: inLossCount > 0 ? Colors.red.shade700 : (inAlertCount > 0 ? Colors.amber.shade800 : Colors.green.shade700),
+                  iconColor: inLossCount > 0 ? colors.statusPerdida : (inAlertCount > 0 ? colors.statusAlerta : colors.statusNormal),
                   value: '$inLossCount / $inAlertCount',
                   label: 'En Riesgo / Pérdida',
                   sublabel: inLossCount > 0 ? '>25% inasistencias' : '>15% inasistencias',
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: spacing.xs),
               Expanded(
                 child: _buildMetricTile(
                   icon: Icons.verified_user_rounded,
-                  iconColor: _uniguajiraBlue,
+                  iconColor: colors.primary,
                   value: '$signedActas',
                   label: 'Actas HMAC-SHA256',
                   sublabel: 'firmas verificadas',
@@ -695,34 +706,34 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: spacing.xs),
           // Huella de integridad global
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xxs + 1),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Colors.grey.shade300),
+              color: colors.surfaceContainer,
+              borderRadius: radii.borderXs,
+              border: Border.all(color: colors.outlineVariant),
             ),
             child: Row(
               children: <Widget>[
-                const Icon(Icons.fingerprint, size: 16, color: _uniguajiraBlue),
-                const SizedBox(width: 6),
-                const Text(
+                Icon(Icons.fingerprint, size: 16, color: colors.primary),
+                SizedBox(width: spacing.xxs + 2),
+                Text(
                   'HMAC Reporte: ',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.bold,
-                    color: _uniguajiraBlue,
+                    color: colors.primary,
                   ),
                 ),
                 Expanded(
                   child: Text(
                     reportHmac,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 10.5,
-                      color: Colors.black87,
+                      color: colors.onSurface,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -757,31 +768,28 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     required String label,
     required String sublabel,
   }) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: spacing.symmetric(horizontal: spacing.xs + 2, vertical: spacing.xs),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            offset: const Offset(0, 1),
-            blurRadius: 3,
-          ),
-        ],
+        color: colors.surfaceContainer,
+        borderRadius: radii.borderSm,
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Row(
         children: <Widget>[
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: spacing.all(spacing.xxs + 2),
             decoration: BoxDecoration(
               color: iconColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: radii.borderSm,
             ),
             child: Icon(icon, color: iconColor, size: 20),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: spacing.xs),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -789,9 +797,10 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
               children: <Widget>[
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
+                    color: colors.onSurface,
                   ),
                 ),
                 Text(
@@ -799,7 +808,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade800,
+                    color: colors.onSurface,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -807,7 +816,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                   sublabel,
                   style: TextStyle(
                     fontSize: 9.5,
-                    color: Colors.grey.shade600,
+                    color: colors.onSurfaceMuted,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -827,24 +836,27 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     ThemeData theme,
     List<StudentAttendanceMetric> students,
   ) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+
     if (students.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: spacing.insetsXl,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(Icons.group_off_outlined, size: 56, color: Colors.grey.shade400),
-              const SizedBox(height: 16),
-              const Text(
+              Icon(Icons.group_off_outlined, size: 56, color: colors.onSurfaceMuted),
+              SizedBox(height: spacing.md),
+              Text(
                 'No hay estudiantes inscritos en el curso.',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colors.onSurface),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: spacing.xs),
               Text(
                 'Importa el roster desde la pantalla anterior para visualizar métricas.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                style: TextStyle(color: colors.onSurfaceMuted, fontSize: 13),
               ),
             ],
           ),
@@ -858,67 +870,56 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
       children: <Widget>[
         // Barra de búsqueda y filtros rápidos
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: TextField(
-                    onChanged: (val) => setState(() => _searchQuery = val),
-                    decoration: InputDecoration(
-                      hintText: 'Buscar por nombre o código...',
-                      hintStyle: const TextStyle(fontSize: 13),
-                      prefixIcon: const Icon(Icons.search, size: 20),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                    ),
-                  ),
-                ),
+          padding: spacing.only(
+            left: spacing.sm,
+            top: spacing.xs + 2,
+            right: spacing.sm,
+            bottom: spacing.xxs + 2,
+          ),
+          child: SizedBox(
+            height: 40,
+            child: TextField(
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: const InputDecoration(
+                hintText: 'Buscar por nombre o código...',
+                prefixIcon: Icon(Icons.search, size: 20),
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
               ),
-            ],
+            ),
           ),
         ),
 
         // Filtro por Chips de Semáforo
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xxs),
           child: Row(
             children: <Widget>[
               _buildFilterChoiceChip('ALL', 'Todos (${students.length})'),
-              const SizedBox(width: 6),
+              SizedBox(width: spacing.xxs + 2),
               _buildFilterChoiceChip(
                 'NORMAL',
                 'Normal (${students.where((s) => s.absencePercentage < 15.0).length})',
-                chipColor: Colors.green.shade700,
+                chipColor: colors.statusNormal,
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: spacing.xxs + 2),
               _buildFilterChoiceChip(
                 'ALERT',
                 'Alerta >15% (${_countStudentsInAlert(students)})',
-                chipColor: Colors.amber.shade900,
+                chipColor: colors.statusAlerta,
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: spacing.xxs + 2),
               _buildFilterChoiceChip(
                 'LOSS',
                 'Pérdida >25% (${_countStudentsInLoss(students)})',
-                chipColor: Colors.red.shade800,
+                chipColor: colors.statusPerdida,
               ),
             ],
           ),
         ),
 
-        const Divider(height: 12),
+        Divider(height: spacing.sm),
 
         // Lista de Estudiantes
         Expanded(
@@ -926,13 +927,18 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
               ? Center(
                   child: Text(
                     'No hay estudiantes que coincidan con el filtro.',
-                    style: TextStyle(color: Colors.grey.shade600),
+                    style: TextStyle(color: colors.onSurfaceMuted),
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                  padding: spacing.only(
+                    left: spacing.sm,
+                    top: spacing.xxs,
+                    right: spacing.sm,
+                    bottom: spacing.md,
+                  ),
                   itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => SizedBox(height: spacing.xs),
                   itemBuilder: (BuildContext context, int index) {
                     final metric = filtered[index];
                     return _buildStudentMetricCard(theme, metric);
@@ -948,21 +954,25 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     String label, {
     Color? chipColor,
   }) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
     final isSelected = _studentFilter == key;
+    final activeColor = chipColor ?? colors.primary;
+
     return ChoiceChip(
       label: Text(label),
       labelStyle: TextStyle(
         fontSize: 11.5,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         color: isSelected
-            ? Colors.white
-            : (chipColor ?? _uniguajiraBlue),
+            ? colors.onPrimary
+            : activeColor,
       ),
       selected: isSelected,
-      selectedColor: chipColor ?? _uniguajiraBlue,
-      backgroundColor: Colors.grey.shade100,
+      selectedColor: activeColor,
+      backgroundColor: colors.surfaceContainerHigh,
       showCheckmark: false,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs / 2),
       onSelected: (bool selected) {
         if (selected) {
           setState(() => _studentFilter = key);
@@ -975,6 +985,10 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     ThemeData theme,
     StudentAttendanceMetric metric,
   ) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final isLoss = metric.alertStatus == AttendanceAlertStatus.failureByAbsences ||
         metric.absencePercentage >= 25.0;
     final isAlert = (metric.alertStatus == AttendanceAlertStatus.attendanceAlert ||
@@ -982,11 +996,11 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
         !isLoss;
 
     final badgeColor = isLoss
-        ? Colors.red.shade700
-        : (isAlert ? Colors.amber.shade900 : Colors.green.shade700);
+        ? colors.statusPerdida
+        : (isAlert ? colors.statusAlerta : colors.statusNormal);
     final badgeBg = isLoss
-        ? Colors.red.shade50
-        : (isAlert ? Colors.amber.shade50 : Colors.green.shade50);
+        ? colors.statusPerdidaContainer
+        : (isAlert ? colors.statusAlertaContainer : colors.statusNormalContainer);
     final badgeText = isLoss ? 'PÉRDIDA' : (isAlert ? 'ALERTA' : 'NORMAL');
 
     final bitPadded = metric.bitIndex.toString().padLeft(2, '0');
@@ -994,17 +1008,16 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+      shape: radii.cardShape(
         side: BorderSide(
           color: isLoss
-              ? Colors.red.shade200
-              : (isAlert ? Colors.amber.shade300 : Colors.grey.shade300),
+              ? colors.statusPerdida.withValues(alpha: 0.5)
+              : (isAlert ? colors.statusAlerta.withValues(alpha: 0.5) : colors.outlineVariant),
           width: isLoss || isAlert ? 1.5 : 1.0,
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: spacing.insetsSm,
         child: Column(
           children: <Widget>[
             Row(
@@ -1016,20 +1029,20 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                   height: 38,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: _uniguajiraBlue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: colors.primaryContainer,
+                    borderRadius: radii.borderSm,
                   ),
                   child: Text(
                     '#$bitPadded',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: _uniguajiraBlue,
+                      color: colors.onPrimaryContainer,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: spacing.xs + 2),
 
                 // Datos del Estudiante
                 Expanded(
@@ -1038,31 +1051,32 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                     children: <Widget>[
                       Text(
                         metric.fullName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
+                          color: colors.onSurface,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: spacing.xxs / 2),
                       Row(
                         children: <Widget>[
                           Text(
                             'Cód: ${metric.studentCode}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'monospace',
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
-                              color: _uniguajiraBlue,
+                              color: colors.primary,
                             ),
                           ),
                           if (metric.email != null && metric.email!.isNotEmpty) ...<Widget>[
-                            const SizedBox(width: 8),
+                            SizedBox(width: spacing.xs),
                             Expanded(
                               child: Text(
                                 metric.email!,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.grey.shade600,
+                                  color: colors.onSurfaceMuted,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1076,10 +1090,10 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
 
                 // Chip de Semáforo
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
                   decoration: BoxDecoration(
                     color: badgeBg,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: radii.borderXs,
                     border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
                   ),
                   child: Row(
@@ -1092,7 +1106,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                         size: 13,
                         color: badgeColor,
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: spacing.xxs),
                       Text(
                         badgeText,
                         style: TextStyle(
@@ -1107,20 +1121,20 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
               ],
             ),
 
-            const SizedBox(height: 10),
+            SizedBox(height: spacing.xs + 2),
 
             // Barra de progreso de asistencia
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: radii.borderXs,
               child: LinearProgressIndicator(
                 value: metric.attendancePercentage / 100.0,
                 minHeight: 6,
-                backgroundColor: Colors.grey.shade200,
+                backgroundColor: colors.surfaceContainerHigh,
                 valueColor: AlwaysStoppedAnimation<Color>(badgeColor),
               ),
             ),
 
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
 
             // Métricas detalladas: BLE, Manual, Inasistencias, Porcentaje
             Row(
@@ -1130,25 +1144,25 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                   icon: Icons.bluetooth,
                   label: 'BLE',
                   value: '${metric.bleAttendances}',
-                  color: Colors.blue.shade700,
+                  color: colors.bleAccent,
                 ),
                 _buildStatPill(
                   icon: Icons.how_to_reg,
                   label: 'Manual',
                   value: '${metric.manualAttendances}',
-                  color: Colors.teal.shade700,
+                  color: colors.manualAccent,
                 ),
                 _buildStatPill(
                   icon: Icons.event_busy,
                   label: 'Fallas',
                   value: '${metric.totalAbsences}',
-                  color: metric.totalAbsences > 0 ? Colors.red.shade700 : Colors.grey.shade600,
+                  color: metric.totalAbsences > 0 ? colors.statusPerdida : colors.onSurfaceMuted,
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs / 2),
                   decoration: BoxDecoration(
                     color: badgeBg,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: radii.borderXs,
                   ),
                   child: Text(
                     '${metric.attendancePercentage}% Asist.',
@@ -1173,14 +1187,17 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     required String value,
     required Color color,
   }) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         Icon(icon, size: 14, color: color),
-        const SizedBox(width: 3),
+        SizedBox(width: spacing.xxs / 2),
         Text(
           '$label: ',
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          style: TextStyle(fontSize: 11, color: colors.onSurfaceMuted),
         ),
         Text(
           value,
@@ -1202,24 +1219,27 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     ThemeData theme,
     CourseAttendanceSummary summary,
   ) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+
     if (_sessions.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: spacing.insetsXl,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(Icons.history_toggle_off, size: 56, color: Colors.grey.shade400),
-              const SizedBox(height: 16),
-              const Text(
+              Icon(Icons.history_toggle_off, size: 56, color: colors.onSurfaceMuted),
+              SizedBox(height: spacing.md),
+              Text(
                 'No hay sesiones de clase registradas.',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colors.onSurface),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: spacing.xs),
               Text(
                 'Inicia una sesión de asistencia BLE con el botón inferior.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                style: TextStyle(color: colors.onSurfaceMuted, fontSize: 13),
               ),
             ],
           ),
@@ -1228,9 +1248,9 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.all(12),
+      padding: spacing.insetsSm,
       itemCount: _sessions.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => SizedBox(height: spacing.xs + 2),
       itemBuilder: (BuildContext context, int index) {
         final session = _sessions[index];
         final signature = _actaSignatures[session.id];
@@ -1246,6 +1266,10 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     String? signature,
     bool hasActa,
   ) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final isClosed = session.closedAt != null || hasActa;
     final startDate = DateTime.tryParse(session.startedAt);
     final formattedStart = startDate != null
@@ -1260,15 +1284,14 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+      shape: radii.cardShape(
         side: BorderSide(
-          color: isClosed ? Colors.green.shade300 : Colors.blue.shade300,
+          color: isClosed ? colors.statusNormal.withValues(alpha: 0.5) : colors.bleAccent.withValues(alpha: 0.5),
           width: 1.2,
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: spacing.insetsCard,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -1276,12 +1299,12 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
             Row(
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
                   decoration: BoxDecoration(
-                    color: isClosed ? Colors.green.shade50 : Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(6),
+                    color: isClosed ? colors.statusNormalContainer : colors.bleAccentContainer,
+                    borderRadius: radii.borderXs,
                     border: Border.all(
-                      color: isClosed ? Colors.green.shade400 : Colors.blue.shade400,
+                      color: isClosed ? colors.statusNormal.withValues(alpha: 0.4) : colors.bleAccent.withValues(alpha: 0.4),
                     ),
                   ),
                   child: Row(
@@ -1290,15 +1313,15 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                       Icon(
                         isClosed ? Icons.verified_user : Icons.timelapse,
                         size: 14,
-                        color: isClosed ? Colors.green.shade800 : Colors.blue.shade800,
+                        color: isClosed ? colors.onStatusNormalContainer : colors.onBleAccentContainer,
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: spacing.xxs),
                       Text(
                         isClosed ? 'CERRADA Y FIRMADA' : 'SESIÓN ABIERTA',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: isClosed ? Colors.green.shade800 : Colors.blue.shade800,
+                          color: isClosed ? colors.onStatusNormalContainer : colors.onBleAccentContainer,
                         ),
                       ),
                     ],
@@ -1306,24 +1329,24 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  padding: spacing.symmetric(horizontal: spacing.xs + 2, vertical: spacing.xxs / 2),
                   decoration: BoxDecoration(
-                    color: _uniguajiraGold.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _uniguajiraGold.withValues(alpha: 0.7)),
+                    color: colors.secondaryContainer.withValues(alpha: 0.3),
+                    borderRadius: radii.borderSm,
+                    border: Border.all(color: colors.secondary.withValues(alpha: 0.7)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      const Icon(Icons.dialpad, size: 14, color: Colors.black87),
-                      const SizedBox(width: 4),
+                      Icon(Icons.dialpad, size: 14, color: colors.onSecondaryContainer),
+                      SizedBox(width: spacing.xxs),
                       Text(
                         'PIN Verbal: ${session.roomPin}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'monospace',
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
-                          color: Colors.black87,
+                          color: colors.onSecondaryContainer,
                         ),
                       ),
                     ],
@@ -1332,42 +1355,42 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
               ],
             ),
 
-            const SizedBox(height: 10),
+            SizedBox(height: spacing.xs + 2),
 
             // Fechas de Apertura y Cierre
             Row(
               children: <Widget>[
-                Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
-                const SizedBox(width: 6),
+                Icon(Icons.calendar_today, size: 14, color: colors.onSurfaceMuted),
+                SizedBox(width: spacing.xxs + 2),
                 Text(
                   'Apertura: $formattedStart',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.onSurface),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: spacing.xxs),
             Row(
               children: <Widget>[
-                Icon(Icons.lock_clock, size: 14, color: Colors.grey.shade600),
-                const SizedBox(width: 6),
+                Icon(Icons.lock_clock, size: 14, color: colors.onSurfaceMuted),
+                SizedBox(width: spacing.xxs + 2),
                 Text(
                   'Cierre: $formattedClosed',
                   style: TextStyle(
                     fontSize: 12,
-                    color: isClosed ? Colors.grey.shade800 : Colors.blue.shade700,
+                    color: isClosed ? colors.onSurface : colors.bleAccent,
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
 
             // Bitmap de 8 Bytes en Hexadecimal
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(6),
+                color: colors.surfaceContainerLow,
+                borderRadius: radii.borderXs,
               ),
               child: Row(
                 children: <Widget>[
@@ -1376,7 +1399,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade700,
+                      color: colors.onSurfaceMuted,
                     ),
                   ),
                   Expanded(
@@ -1386,7 +1409,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                         fontFamily: 'monospace',
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: isClosed ? Colors.green.shade800 : Colors.blue.shade900,
+                        color: isClosed ? colors.statusNormal : colors.bleAccent,
                       ),
                     ),
                   ),
@@ -1394,27 +1417,27 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
               ),
             ),
 
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
 
             // Firma HMAC Criptográfica
             if (signature != null && signature.isNotEmpty) ...<Widget>[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
                 decoration: BoxDecoration(
-                  color: Colors.purple.shade50,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.purple.shade200),
+                  color: colors.manualAccentContainer.withValues(alpha: 0.3),
+                  borderRadius: radii.borderXs,
+                  border: Border.all(color: colors.manualAccent.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: <Widget>[
-                    Icon(Icons.key, size: 14, color: Colors.purple.shade800),
-                    const SizedBox(width: 4),
-                    const Text(
+                    Icon(Icons.key, size: 14, color: colors.manualAccent),
+                    SizedBox(width: spacing.xxs),
+                    Text(
                       'Firma HMAC: ',
                       style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.bold,
-                        color: Colors.purple,
+                        color: colors.manualAccent,
                       ),
                     ),
                     Expanded(
@@ -1423,7 +1446,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 10,
-                          color: Colors.purple.shade900,
+                          color: colors.onSurface,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1446,7 +1469,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: spacing.xs + 2),
             ],
 
             // Botón de Acción: Ver Acta o Reanudar
@@ -1459,7 +1482,8 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                     icon: const Icon(Icons.description_outlined, size: 16),
                     label: const Text('Ver Acta Firmada'),
                     style: FilledButton.styleFrom(
-                      foregroundColor: _uniguajiraBlue,
+                      foregroundColor: colors.primary,
+                      shape: radii.buttonShape(),
                     ),
                   )
                 else
@@ -1468,7 +1492,9 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                     icon: const Icon(Icons.sensors, size: 16),
                     label: const Text('Reanudar Sesión BLE'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: _uniguajiraBlue,
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                      shape: radii.buttonShape(),
                     ),
                   ),
               ],
@@ -1487,41 +1513,41 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     ThemeData theme,
     CourseAttendanceSummary summary,
   ) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
     final lastResult = _lastSyncResult;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: spacing.insetsCard,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           // Tarjeta Informativa Institucional
           Card(
             elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(color: Colors.blue.shade200),
-            ),
-            color: Colors.blue.shade50.withValues(alpha: 0.5),
+            shape: radii.cardShape(side: BorderSide(color: colors.primary.withValues(alpha: 0.3))),
+            color: colors.primaryContainer.withValues(alpha: 0.4),
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: spacing.insetsCard,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Icon(Icons.school, color: _uniguajiraBlue, size: 28),
-                  const SizedBox(width: 12),
+                  Icon(Icons.school, color: colors.primary, size: 28),
+                  SizedBox(width: spacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        const Text(
+                        Text(
                           'Sincronización Institucional Uniguajira',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: _uniguajiraBlue,
+                            color: colors.primary,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: spacing.xxs),
                         Text(
                           'Exporta de manera segura el libro oficial de asistencia '
                           'hacia la cuenta institucional ${AppConstants.institutionalDomain}. '
@@ -1529,7 +1555,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                           'HMAC-SHA256 para auditoría sin requerir dependencias propietarias.',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade800,
+                            color: colors.onSurfaceMuted,
                             height: 1.3,
                           ),
                         ),
@@ -1541,32 +1567,29 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          SizedBox(height: spacing.md),
 
           // Formulario de Validación de Correo
           Card(
             elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(color: Colors.grey.shade300),
-            ),
+            shape: radii.cardShape(side: BorderSide(color: colors.outlineVariant)),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: spacing.insetsCard,
               child: Form(
                 key: _syncFormKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    const Text(
+                    Text(
                       'Cuenta Institucional del Docente',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.onSurface),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: spacing.xxs),
                     Text(
                       'Solo se admiten correos con dominio ${AppConstants.institutionalDomain}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style: TextStyle(fontSize: 12, color: colors.onSurfaceMuted),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: spacing.sm),
                     TextFormField(
                       controller: _institutionalEmailController,
                       keyboardType: TextInputType.emailAddress,
@@ -1575,11 +1598,6 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                         labelText: 'Correo Institucional',
                         hintText: 'docente${AppConstants.institutionalDomain}',
                         prefixIcon: const Icon(Icons.alternate_email),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
                       ),
                       validator: (value) {
                         final email = value?.trim() ?? '';
@@ -1592,18 +1610,18 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: spacing.md),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
                         onPressed: _isSyncing ? null : _handleInstitutionalSync,
                         icon: _isSyncing
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: colors.onPrimary,
                                 ),
                               )
                             : const Icon(Icons.cloud_upload_outlined),
@@ -1613,11 +1631,10 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                               : 'Sincronizar con Google Sheets ${AppConstants.institutionalDomain}',
                         ),
                         style: FilledButton.styleFrom(
-                          backgroundColor: _uniguajiraBlue,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                          backgroundColor: colors.primary,
+                          foregroundColor: colors.onPrimary,
+                          padding: spacing.symmetric(vertical: spacing.sm),
+                          shape: radii.buttonShape(),
                         ),
                       ),
                     ),
@@ -1627,12 +1644,12 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          SizedBox(height: spacing.md),
 
           // Tarjeta de Resultado de la Sincronización
           if (lastResult != null) ...<Widget>[
             _buildSyncResultCard(theme, lastResult),
-            const SizedBox(height: 16),
+            SizedBox(height: spacing.md),
           ],
 
           // Estructura de las 4 Hojas Reglamentarias
@@ -1643,25 +1660,29 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
   }
 
   Widget _buildSyncResultCard(ThemeData theme, CloudSyncResult result) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final isSuccess = result.isSuccess;
     final isSynced = result.isSynced;
 
+    final cardBorder = isSynced
+        ? colors.statusNormal.withValues(alpha: 0.5)
+        : (isSuccess ? colors.bleAccent.withValues(alpha: 0.5) : colors.statusPerdida.withValues(alpha: 0.5));
+    final cardBg = isSynced
+        ? colors.statusNormalContainer.withValues(alpha: 0.3)
+        : (isSuccess ? colors.bleAccentContainer.withValues(alpha: 0.3) : colors.statusPerdidaContainer.withValues(alpha: 0.3));
+    final statusColor = isSynced
+        ? colors.statusNormal
+        : (isSuccess ? colors.bleAccent : colors.statusPerdida);
+
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: isSynced
-              ? Colors.green.shade400
-              : (isSuccess ? Colors.blue.shade400 : Colors.red.shade400),
-          width: 1.5,
-        ),
-      ),
-      color: isSynced
-          ? Colors.green.shade50
-          : (isSuccess ? Colors.blue.shade50 : Colors.red.shade50),
+      shape: radii.cardShape(side: BorderSide(color: cardBorder, width: 1.5)),
+      color: cardBg,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: spacing.insetsCard,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -1671,11 +1692,9 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                   isSynced
                       ? Icons.check_circle
                       : (isSuccess ? Icons.cloud_done : Icons.error),
-                  color: isSynced
-                      ? Colors.green.shade800
-                      : (isSuccess ? Colors.blue.shade800 : Colors.red.shade800),
+                  color: statusColor,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: spacing.xs),
                 Expanded(
                   child: Text(
                     isSynced
@@ -1686,70 +1705,70 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: isSynced
-                          ? Colors.green.shade900
-                          : (isSuccess ? Colors.blue.shade900 : Colors.red.shade900),
+                      color: statusColor,
                     ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs / 2),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
+                    color: colors.surfaceContainer,
+                    borderRadius: radii.borderXs,
                   ),
                   child: Text(
                     result.status,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.bold,
                       fontSize: 10,
+                      color: colors.onSurface,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: spacing.sm),
             Text(
               'Cuenta: ${result.institutionalEmail ?? "No informada"}',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.onSurface),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: spacing.xxs),
             Text(
               'Total de filas procesadas: ${result.sheetsRowCount} en 4 hojas',
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(fontSize: 12, color: colors.onSurfaceMuted),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: spacing.xxs),
             Text(
               'Fecha ISO: ${result.syncedAtIso}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 11, color: colors.onSurfaceMuted),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: spacing.all(spacing.xs),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.grey.shade300),
+                color: colors.surfaceContainer,
+                borderRadius: radii.borderXs,
+                border: Border.all(color: colors.outlineVariant),
               ),
               child: Row(
                 children: <Widget>[
-                  const Icon(Icons.fingerprint, size: 14, color: _uniguajiraBlue),
-                  const SizedBox(width: 6),
-                  const Text(
+                  Icon(Icons.fingerprint, size: 14, color: colors.primary),
+                  SizedBox(width: spacing.xxs + 2),
+                  Text(
                     'HMAC: ',
                     style: TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.bold,
-                      color: _uniguajiraBlue,
+                      color: colors.primary,
                     ),
                   ),
                   Expanded(
                     child: Text(
                       result.reportSignatureHmac,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 10,
+                        color: colors.onSurface,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1779,48 +1798,49 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
   }
 
   Widget _buildSheetsSummaryCard(CourseAttendanceSummary summary) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade300),
-      ),
+      shape: radii.cardShape(side: BorderSide(color: colors.outlineVariant)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: spacing.insetsCard,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const Text(
+            Text(
               'Estructura del Libro Oficial (4 Hojas)',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.onSurface),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: spacing.xxs),
             Text(
               'Especificación técnica reglamentaria de la Universidad de La Guajira.',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: colors.onSurfaceMuted),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: spacing.sm),
             _buildSheetRow(
               '1. Resumen',
               'Consolidado por estudiante con Bit Index, % de asistencia y estado de alerta.',
               summary.sheets['Resumen']?.length ?? 0,
               Icons.people_outline,
             ),
-            const Divider(height: 16),
+            Divider(height: spacing.md),
             _buildSheetRow(
               '2. Detalle',
               'Matriz individual sesión por estudiante con RSSI, Time-Tick y método BLE/Manual.',
               summary.sheets['Detalle']?.length ?? 0,
               Icons.format_list_bulleted,
             ),
-            const Divider(height: 16),
+            Divider(height: spacing.md),
             _buildSheetRow(
               '3. Sesiones',
               'Historial de sesiones, PIN verbal, Bitmap de 8 bytes y hashes de actas.',
               summary.sheets['Sesiones']?.length ?? 0,
               Icons.history,
             ),
-            const Divider(height: 16),
+            Divider(height: spacing.md),
             _buildSheetRow(
               '4. Metadatos',
               'Identificadores del curso, docente, fecha ISO8601 y huella HMAC-SHA256 global.',
@@ -1839,47 +1859,52 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     int rowCount,
     IconData icon,
   ) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Container(
-          padding: const EdgeInsets.all(6),
+          padding: spacing.all(spacing.xxs + 2),
           decoration: BoxDecoration(
-            color: _uniguajiraBlue.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            color: colors.primaryContainer,
+            borderRadius: radii.borderSm,
           ),
-          child: Icon(icon, size: 18, color: _uniguajiraBlue),
+          child: Icon(icon, size: 18, color: colors.primary),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: spacing.xs + 2),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
                 title,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colors.onSurface),
               ),
-              const SizedBox(height: 2),
+              SizedBox(height: spacing.xxs / 2),
               Text(
                 description,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 11, color: colors.onSurfaceMuted),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: spacing.xs),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs / 2),
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(6),
+            color: colors.surfaceContainerHigh,
+            borderRadius: radii.borderXs,
           ),
           child: Text(
             '$rowCount filas',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
               fontFamily: 'monospace',
+              color: colors.onSurface,
             ),
           ),
         ),
@@ -1892,18 +1917,20 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
   // ===========================================================================
 
   Widget _buildBottomActions(ThemeData theme) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      padding: spacing.only(
+        left: spacing.md,
+        top: spacing.xs + 2,
+        right: spacing.md,
+        bottom: spacing.sm + 2,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: const Offset(0, -2),
-            blurRadius: 6,
-          ),
-        ],
+        color: colors.surfaceContainer,
+        border: Border(top: BorderSide(color: colors.outlineVariant)),
       ),
       child: SafeArea(
         top: false,
@@ -1912,12 +1939,12 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
           child: FilledButton.icon(
             onPressed: _isExporting ? null : _exportOfficialExcelWorkbook,
             icon: _isExporting
-                ? const SizedBox(
+                ? SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: colors.onStatusNormal,
                     ),
                   )
                 : const Icon(Icons.table_view_rounded),
@@ -1928,12 +1955,10 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
             ),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF107C41), // Verde Excel oficial
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              backgroundColor: colors.statusNormal,
+              foregroundColor: colors.onStatusNormal,
+              padding: spacing.symmetric(vertical: spacing.sm),
+              shape: radii.buttonShape(),
             ),
           ),
         ),

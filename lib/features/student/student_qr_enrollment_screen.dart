@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/models/student_enrollment_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/student_enrollment_service.dart';
+import '../../theme/theme.dart';
 
 /// Pantalla de enrolamiento del estudiante mediante código QR del docente.
 ///
@@ -154,20 +155,22 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
     } on FormatException catch (e) {
       if (!mounted) return;
       setState(() => _isProcessing = false);
+      final colors = AppColors.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.message),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: colors.statusPerdida,
           duration: const Duration(seconds: 4),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isProcessing = false);
+      final colors = AppColors.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error inesperado al procesar enrolamiento: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: colors.statusPerdida,
           duration: const Duration(seconds: 4),
         ),
       );
@@ -178,16 +181,20 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
     StudentEnrollmentModel enrollment,
   ) async {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
 
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext ctx) {
         return AlertDialog(
+          shape: radii.dialogShape(),
           icon: Icon(
             Icons.check_circle_rounded,
             size: 56,
-            color: theme.colorScheme.primary,
+            color: colors.statusNormal,
           ),
           title: const Text(
             '¡Enrolamiento Exitoso!',
@@ -205,17 +212,17 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
                     'Te has vinculado correctamente al curso:',
                     style: theme.textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: spacing.xs),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                    padding: spacing.insetsMd,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer.withValues(
+                      color: colors.primaryContainer.withValues(
                         alpha: 0.4,
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: radii.borderMd,
                       border: Border.all(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                        color: colors.primary.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Column(
@@ -225,15 +232,15 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
                           enrollment.courseName,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
+                            color: colors.primary,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        SizedBox(height: spacing.xxs),
                         Text(
                           'Código Asignatura: ${enrollment.courseCode}',
                           style: theme.textTheme.bodySmall,
                         ),
-                        const Divider(height: 16),
+                        Divider(height: spacing.md),
                         Text(
                           'Estudiante: ${enrollment.fullName}',
                           style: theme.textTheme.bodyMedium?.copyWith(
@@ -249,20 +256,20 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: spacing.sm),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 12,
+                    padding: spacing.symmetric(
+                      horizontal: spacing.sm,
+                      vertical: spacing.xs,
                     ),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.secondaryContainer.withValues(
+                      color: colors.secondaryContainer.withValues(
                         alpha: 0.5,
                       ),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: radii.borderSm,
                       border: Border.all(
-                        color: theme.colorScheme.secondary.withValues(
+                        color: colors.secondary.withValues(
                           alpha: 0.3,
                         ),
                       ),
@@ -271,28 +278,28 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
                       children: <Widget>[
                         Icon(
                           Icons.tag,
-                          color: theme.colorScheme.secondary,
+                          color: colors.secondary,
                           size: 22,
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: spacing.xs),
                         Expanded(
                           child: Text(
                             'Bit Asignado en Aula: #${enrollment.bitIndex.toString().padLeft(2, '0')} (0..63)',
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.secondary,
+                              color: colors.secondary,
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: spacing.xs),
                   Text(
                     'Tu semilla criptográfica individual y el secreto compartido '
                     'han sido guardados localmente en tu teléfono de forma Offline.',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: colors.onSurfaceMuted,
                       height: 1.3,
                     ),
                   ),
@@ -302,6 +309,7 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
           ),
           actions: <Widget>[
             FilledButton(
+              style: FilledButton.styleFrom(shape: radii.buttonShape()),
               onPressed: () => Navigator.of(ctx).pop(),
               child: const Text('Continuar a Mis Cursos'),
             ),
@@ -313,20 +321,18 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Enrolar Curso'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: theme.colorScheme.onPrimary,
-          unselectedLabelColor: theme.colorScheme.onPrimary.withValues(
+          labelColor: colors.onPrimary,
+          unselectedLabelColor: colors.onPrimary.withValues(
             alpha: 0.7,
           ),
-          indicatorColor: theme.colorScheme.onPrimary,
+          indicatorColor: colors.secondary,
           indicatorWeight: 3,
           tabs: const <Tab>[
             Tab(
@@ -344,14 +350,18 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
         controller: _tabController,
         physics: const NeverScrollableScrollPhysics(),
         children: <Widget>[
-          _buildCameraScannerTab(theme),
-          _buildManualPasteTab(theme),
+          _buildCameraScannerTab(context),
+          _buildManualPasteTab(context),
         ],
       ),
     );
   }
 
-  Widget _buildCameraScannerTab(ThemeData theme) {
+  Widget _buildCameraScannerTab(BuildContext context) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Stack(
       children: <Widget>[
         // Visor de cámara QR
@@ -359,33 +369,33 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
           controller: _scannerController,
           onDetect: _handleBarcodeDetected,
           errorBuilder: (context, error) {
-            return _buildCameraErrorView(error, theme);
+            return _buildCameraErrorView(context, error);
           },
           overlayBuilder: (context, constraints) {
-            return _buildScannerGuideOverlay(constraints, theme);
+            return _buildScannerGuideOverlay(context, constraints);
           },
         ),
 
         // Barra flotante de controles superiores
         Positioned(
-          top: 16,
-          right: 16,
+          top: spacing.md,
+          right: spacing.md,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               FloatingActionButton.small(
                 heroTag: 'fab_torch',
-                backgroundColor: Colors.black.withValues(alpha: 0.6),
-                foregroundColor: _isTorchOn ? Colors.amber : Colors.white,
+                backgroundColor: colors.surface.withValues(alpha: 0.75),
+                foregroundColor: _isTorchOn ? colors.secondary : colors.onSurface,
                 onPressed: _toggleTorch,
                 tooltip: _isTorchOn ? 'Apagar linterna' : 'Encender linterna',
                 child: Icon(_isTorchOn ? Icons.flash_on : Icons.flash_off),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: spacing.xs),
               FloatingActionButton.small(
                 heroTag: 'fab_switch_camera',
-                backgroundColor: Colors.black.withValues(alpha: 0.6),
-                foregroundColor: Colors.white,
+                backgroundColor: colors.surface.withValues(alpha: 0.75),
+                foregroundColor: colors.onSurface,
                 onPressed: _switchCamera,
                 tooltip: 'Cambiar cámara',
                 child: const Icon(Icons.cameraswitch_outlined),
@@ -397,21 +407,22 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
         // Indicador de procesamiento en curso
         if (_isProcessing)
           Container(
-            color: Colors.black.withValues(alpha: 0.6),
+            color: colors.surface.withValues(alpha: 0.65),
             child: Center(
               child: Card(
                 elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                shape: radii.cardShape(),
+                child: Padding(
+                  padding: spacing.symmetric(
+                    horizontal: spacing.lg,
+                    vertical: spacing.md,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text(
+                      const CircularProgressIndicator(),
+                      SizedBox(height: spacing.md),
+                      const Text(
                         'Procesando credencial...',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
@@ -426,9 +437,12 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
   }
 
   Widget _buildScannerGuideOverlay(
+    BuildContext context,
     BoxConstraints constraints,
-    ThemeData theme,
   ) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
     final double boxSize = (constraints.maxWidth * 0.72).clamp(220.0, 300.0);
 
     return Stack(
@@ -439,9 +453,9 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
             width: boxSize,
             height: boxSize,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: radii.borderXl,
               border: Border.all(
-                color: theme.colorScheme.primary,
+                color: colors.primary,
                 width: 3,
               ),
             ),
@@ -452,7 +466,7 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
                   child: Icon(
                     Icons.qr_code_2,
                     size: 80,
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: colors.primary.withValues(alpha: 0.35),
                   ),
                 ),
               ],
@@ -462,21 +476,24 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
 
         // Instrucción visual inferior
         Positioned(
-          left: 20,
-          right: 20,
-          bottom: 32,
+          left: spacing.lg,
+          right: spacing.lg,
+          bottom: spacing.xl,
           child: Center(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.75),
-                borderRadius: BorderRadius.circular(12),
+              padding: spacing.symmetric(
+                horizontal: spacing.md,
+                vertical: spacing.xs,
               ),
-              child: const Text(
+              decoration: BoxDecoration(
+                color: colors.surface.withValues(alpha: 0.85),
+                borderRadius: radii.borderMd,
+              ),
+              child: Text(
                 'Apunta la cámara al código QR que tu docente\nmuestra en su pantalla.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white,
+                  color: colors.onSurface,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   height: 1.3,
@@ -490,42 +507,47 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
   }
 
   Widget _buildCameraErrorView(
+    BuildContext context,
     MobileScannerException error,
-    ThemeData theme,
   ) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: spacing.insetsLg,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Icon(
+            Icon(
               Icons.no_photography_outlined,
               size: 64,
-              color: Colors.amber,
+              color: colors.statusAlerta,
             ),
-            const SizedBox(height: 16),
-            const Text(
+            SizedBox(height: spacing.md),
+            Text(
               'No se pudo inicializar la cámara',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: colors.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             Text(
               'Verifica que la aplicación tenga permisos de cámara o utiliza '
               'la pestaña de ingreso manual.',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.white.withValues(alpha: 0.8),
+                color: colors.onSurfaceMuted,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: spacing.lg),
             FilledButton.icon(
+              style: FilledButton.styleFrom(shape: radii.buttonShape()),
               onPressed: () {
                 _tabController.animateTo(1);
               },
@@ -538,9 +560,13 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
     );
   }
 
-  Widget _buildManualPasteTab(ThemeData theme) {
+  Widget _buildManualPasteTab(BuildContext context) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: spacing.insetsLg,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 500),
         child: Column(
@@ -548,14 +574,12 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
           children: <Widget>[
             // Tarjeta informativa de respaldo
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: spacing.insetsMd,
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
+                color: colors.surfaceContainerHigh,
+                borderRadius: radii.borderMd,
                 border: Border.all(
-                  color: theme.colorScheme.outlineVariant.withValues(
-                    alpha: 0.6,
-                  ),
+                  color: colors.outlineVariant,
                 ),
               ),
               child: Row(
@@ -563,16 +587,16 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
                 children: <Widget>[
                   Icon(
                     Icons.info_outline,
-                    color: theme.colorScheme.primary,
+                    color: colors.primary,
                     size: 22,
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: spacing.xs),
                   Expanded(
                     child: Text(
                       'Modo de Respaldo: Si la cámara de tu teléfono presenta fallas '
                       'físicas o requieres realizar pruebas, pega directamente '
                       'aquí la cadena JSON que compone el QR del docente.',
-                      style: theme.textTheme.bodySmall?.copyWith(
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         height: 1.35,
                       ),
                     ),
@@ -580,19 +604,20 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: spacing.md),
 
             // Acciones rápidas de portapapeles
             Row(
               children: <Widget>[
                 Expanded(
                   child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(shape: radii.buttonShape()),
                     onPressed: _pasteFromClipboard,
                     icon: const Icon(Icons.paste_rounded, size: 18),
                     label: const Text('Pegar Portapapeles'),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: spacing.xs),
                 TextButton.icon(
                   onPressed: () => _manualJsonController.clear(),
                   icon: const Icon(Icons.clear, size: 18),
@@ -600,7 +625,7 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: spacing.sm),
 
             // Campo de texto multilínea para el JSON
             TextField(
@@ -611,15 +636,15 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
                 fontFamily: 'monospace',
                 fontSize: 12,
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Contenido JSON del QR *',
                 hintText:
                     '{"courseId": "...", "studentCode": "...", "bitmapIndex": 0, ...}',
                 alignLabelWithHint: true,
-                border: OutlineInputBorder(),
+                border: OutlineInputBorder(borderRadius: radii.borderMd),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: spacing.lg),
 
             // Botón de procesamiento
             FilledButton.icon(
@@ -627,12 +652,12 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
                   ? null
                   : () => _processEnrollmentPayload(_manualJsonController.text),
               icon: _isProcessing
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: colors.onPrimary,
                       ),
                     )
                   : const Icon(Icons.cloud_done_outlined),
@@ -642,10 +667,8 @@ class _StudentQrEnrollmentScreenState extends State<StudentQrEnrollmentScreen>
                     : 'Procesar y Enrolar Credencial',
               ),
               style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                padding: spacing.insetsVMd,
+                shape: radii.buttonShape(),
               ),
             ),
           ],

@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/course_model.dart';
 import '../../data/local/app_database.dart';
+import '../../theme/theme.dart';
 import 'course_detail_screen.dart';
 
 /// Panel principal de gestión de cursos para el docente:
@@ -61,10 +62,11 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+        final colors = AppColors.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al cargar cursos: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            backgroundColor: colors.statusPerdida,
           ),
         );
       }
@@ -81,6 +83,10 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
   }
 
   Future<void> _showCreateCourseDialog() async {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
     final codeController = TextEditingController();
@@ -91,13 +97,12 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
     final created = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) {
-        final theme = Theme.of(ctx);
-
         return AlertDialog(
+          shape: radii.dialogShape(),
           title: Row(
             children: <Widget>[
-              Icon(Icons.add_circle_outline, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
+              Icon(Icons.add_circle_outline, color: colors.primary),
+              SizedBox(width: spacing.xs),
               const Text('Nuevo Curso'),
             ],
           ),
@@ -112,7 +117,6 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Nombre de la Asignatura *',
                       hintText: 'Ej. Sistemas Distribuidos',
-                      border: OutlineInputBorder(),
                     ),
                     textCapitalization: TextCapitalization.words,
                     validator: (value) {
@@ -122,7 +126,7 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: spacing.sm),
                   Row(
                     children: <Widget>[
                       Expanded(
@@ -132,7 +136,6 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Código *',
                             hintText: 'SIS-402',
-                            border: OutlineInputBorder(),
                           ),
                           textCapitalization: TextCapitalization.characters,
                           validator: (value) {
@@ -143,14 +146,13 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: spacing.xs),
                       Expanded(
                         child: TextFormField(
                           controller: groupController,
                           decoration: const InputDecoration(
                             labelText: 'Grupo *',
                             hintText: '01',
-                            border: OutlineInputBorder(),
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
@@ -162,13 +164,12 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: spacing.sm),
                   TextFormField(
                     controller: semesterController,
                     decoration: const InputDecoration(
                       labelText: 'Semestre / Periodo *',
                       hintText: '2026-2',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
@@ -177,13 +178,12 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: spacing.sm),
                   TextFormField(
                     controller: sheetController,
                     decoration: const InputDecoration(
                       labelText: 'ID Google Sheets (Opcional)',
                       hintText: 'Hoja para sincronización SMA',
-                      border: OutlineInputBorder(),
                     ),
                   ),
                 ],
@@ -222,7 +222,7 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                     ScaffoldMessenger.of(ctx).showSnackBar(
                       SnackBar(
                         content: Text('Error al crear curso: $e'),
-                        backgroundColor: theme.colorScheme.error,
+                        backgroundColor: colors.statusPerdida,
                       ),
                     );
                   }
@@ -239,9 +239,9 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
       await _loadCourses();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Curso registrado con éxito.'),
-            backgroundColor: Color(0xFF00843D),
+          SnackBar(
+            content: const Text('Curso registrado con éxito.'),
+            backgroundColor: colors.statusNormal,
           ),
         );
       }
@@ -249,12 +249,14 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
   }
 
   Future<void> _confirmDeleteCourse(CourseModel course) async {
+    final colors = AppColors.of(context);
+    final radii = AppRadii.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) {
-        final theme = Theme.of(ctx);
-
         return AlertDialog(
+          shape: radii.dialogShape(),
           title: const Text('¿Eliminar curso?'),
           content: Text(
             'Se eliminará "${course.name}" (${course.code} - G${course.groupCode}) '
@@ -267,8 +269,8 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: theme.colorScheme.error,
-                foregroundColor: theme.colorScheme.onError,
+                backgroundColor: colors.statusPerdida,
+                foregroundColor: colors.onStatusPerdida,
               ),
               onPressed: () => Navigator.of(ctx).pop(true),
               child: const Text('Eliminar'),
@@ -294,7 +296,7 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error al eliminar curso: $e'),
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: colors.statusPerdida,
             ),
           );
         }
@@ -314,27 +316,31 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gestión de Cursos'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _courses.isEmpty
-              ? _buildEmptyState(theme)
+              ? _buildEmptyState()
               : RefreshIndicator(
                   onRefresh: _loadCourses,
                   child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                    padding: spacing.only(
+                      left: spacing.md,
+                      top: spacing.md,
+                      right: spacing.md,
+                      bottom: spacing.xxl + spacing.xl,
+                    ),
                     itemCount: _courses.length,
                     itemBuilder: (BuildContext context, int index) {
                       final course = _courses[index];
                       final studentCount = _studentCounts[course.id] ?? 0;
-                      return _buildCourseCard(theme, course, studentCount);
+                      return _buildCourseCard(course, studentCount);
                     },
                   ),
                 ),
@@ -342,42 +348,47 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
         onPressed: _showCreateCourseDialog,
         icon: const Icon(Icons.add),
         label: const Text('Nuevo Curso'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
+        backgroundColor: colors.primary,
+        foregroundColor: colors.onPrimary,
       ),
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  Widget _buildEmptyState() {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: spacing.insetsXl,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Icon(
               Icons.school_outlined,
               size: 64,
-              color: theme.colorScheme.primary.withValues(alpha: 0.6),
+              color: colors.primary.withValues(alpha: 0.6),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: spacing.md),
             Text(
               'No tienes cursos registrados',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: colors.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             Text(
               'Crea tu primer curso para gestionar estudiantes, enrolar sus credenciales '
               'por QR y habilitar el radar de asistencia BLE.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: colors.onSurfaceMuted,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: spacing.lg),
             FilledButton.icon(
               onPressed: _showCreateCourseDialog,
               icon: const Icon(Icons.add),
@@ -390,26 +401,25 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
   }
 
   Widget _buildCourseCard(
-    ThemeData theme,
     CourseModel course,
     int studentCount,
   ) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final isFull = studentCount >= AppConstants.bitmapBitCount;
 
     return Card(
       elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
+      margin: spacing.only(bottom: spacing.sm),
+      shape: radii.cardShape(side: BorderSide(color: colors.outlineVariant)),
       child: InkWell(
         onTap: () => _navigateToCourseDetail(course),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: radii.borderLg,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: spacing.insetsCard,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -424,13 +434,14 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                           course.name,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: colors.onSurface,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: spacing.xxs),
                         Text(
                           '${course.code} · Grupo ${course.groupCode} · ${course.semester}',
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                            color: colors.onSurfaceMuted,
                           ),
                         ),
                       ],
@@ -439,26 +450,26 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                   IconButton(
                     icon: Icon(
                       Icons.delete_outline,
-                      color: theme.colorScheme.error.withValues(alpha: 0.8),
+                      color: colors.statusPerdida.withValues(alpha: 0.8),
                     ),
                     tooltip: 'Eliminar curso',
                     onPressed: () => _confirmDeleteCourse(course),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: spacing.sm),
               Row(
                 children: <Widget>[
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
+                    padding: spacing.symmetric(
+                      horizontal: spacing.xs + 2,
+                      vertical: spacing.xxs,
                     ),
                     decoration: BoxDecoration(
                       color: isFull
-                          ? theme.colorScheme.errorContainer
-                          : theme.colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
+                          ? colors.statusPerdidaContainer
+                          : colors.primaryContainer,
+                      borderRadius: radii.borderMd,
                     ),
                     child: Text(
                       '$studentCount / ${AppConstants.bitmapBitCount} estudiantes',
@@ -466,8 +477,8 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: isFull
-                            ? theme.colorScheme.onErrorContainer
-                            : theme.colorScheme.onPrimaryContainer,
+                            ? colors.onStatusPerdidaContainer
+                            : colors.onPrimaryContainer,
                       ),
                     ),
                   ),
@@ -475,16 +486,16 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                   Text(
                     'Ver Roster',
                     style: TextStyle(
-                      color: theme.colorScheme.primary,
+                      color: colors.primary,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  SizedBox(width: spacing.xxs),
                   Icon(
                     Icons.arrow_forward_ios,
                     size: 12,
-                    color: theme.colorScheme.primary,
+                    color: colors.primary,
                   ),
                 ],
               ),

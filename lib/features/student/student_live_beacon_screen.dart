@@ -10,9 +10,7 @@ import '../../core/models/student_enrollment_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/attendance_session_controller.dart';
 import '../../data/services/ble_attendance_service.dart';
-
-/// Verde institucional de la Universidad de La Guajira.
-const Color _uniguajiraGreen = Color(0xFF00843D);
+import '../../theme/theme.dart';
 
 /// Fases del flujo de emisión BLE y recepción de eco en el estudiante.
 enum StudentBeaconPhase {
@@ -335,29 +333,29 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      appBar: _buildAppBar(theme),
+      appBar: _buildAppBar(context),
       body: SafeArea(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 350),
           child: switch (_phase) {
-            StudentBeaconPhase.inputPin => _buildInputPinStep(theme),
-            StudentBeaconPhase.broadcasting => _buildBroadcastingStep(theme),
-            StudentBeaconPhase.confirmed => _buildConfirmedStep(theme),
+            StudentBeaconPhase.inputPin => _buildInputPinStep(context),
+            StudentBeaconPhase.broadcasting => _buildBroadcastingStep(context),
+            StudentBeaconPhase.confirmed => _buildConfirmedStep(context),
           },
         ),
       ),
     );
   }
 
-  PreferredSizeWidget _buildAppBar(ThemeData theme) {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final colors = AppColors.of(context);
+
     if (_phase == StudentBeaconPhase.confirmed) {
       return AppBar(
         title: const Text('Sello Criptográfico Oficial'),
-        backgroundColor: _uniguajiraGreen,
-        foregroundColor: Colors.white,
+        backgroundColor: colors.statusNormal,
+        foregroundColor: colors.onStatusNormal,
         elevation: 0,
         centerTitle: true,
       );
@@ -369,8 +367,6 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
             ? 'Marcar Asistencia BLE'
             : 'Emisión en Aula',
       ),
-      backgroundColor: theme.colorScheme.primary,
-      foregroundColor: theme.colorScheme.onPrimary,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         tooltip: 'Regresar',
@@ -389,7 +385,12 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
   // Paso 1: Ingreso del PIN Verbal del Salón (10..99)
   // ---------------------------------------------------------------------------
 
-  Widget _buildInputPinStep(ThemeData theme) {
+  Widget _buildInputPinStep(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final pinText = _pinController.text.trim();
     final parsed = int.tryParse(pinText);
     final isValidPin =
@@ -400,7 +401,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
 
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: spacing.symmetric(horizontal: spacing.lg, vertical: spacing.md),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),
           child: Column(
@@ -408,8 +409,8 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               // Tarjeta informativa del curso y estudiante
-              _buildCourseSummaryCard(theme),
-              const SizedBox(height: 24),
+              _buildCourseSummaryCard(context),
+              SizedBox(height: spacing.lg),
 
               // Título y explicación del PIN verbal
               Text(
@@ -419,30 +420,30 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: spacing.xs),
               Text(
                 'Digita el número de 2 dígitos (10 a 99) que el profesor dicta '
                 'en el aula para iniciar la emisión de tu beacon seguro.',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: colors.onSurfaceMuted,
                   height: 1.35,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: spacing.lg),
 
               // Campo de entrada grande para el PIN
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: spacing.insetsCard,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  color: colors.surfaceContainerHigh.withValues(
                     alpha: 0.5,
                   ),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: radii.borderXl,
                   border: Border.all(
                     color: isValidPin
-                        ? _uniguajiraGreen
-                        : theme.colorScheme.outlineVariant,
+                        ? colors.statusNormal
+                        : colors.outlineVariant,
                     width: isValidPin ? 2 : 1,
                   ),
                 ),
@@ -462,8 +463,8 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                         fontWeight: FontWeight.bold,
                         letterSpacing: 18,
                         color: isValidPin
-                            ? _uniguajiraGreen
-                            : theme.colorScheme.primary,
+                            ? colors.statusNormal
+                            : colors.primary,
                       ),
                       decoration: const InputDecoration(
                         hintText: '00',
@@ -476,7 +477,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                         }
                       },
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: spacing.xxs),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: <Widget>[
@@ -486,18 +487,18 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                               : Icons.info_outline_rounded,
                           size: 18,
                           color: isValidPin
-                              ? _uniguajiraGreen
-                              : theme.colorScheme.outline,
+                              ? colors.statusNormal
+                              : colors.outline,
                         ),
-                        const SizedBox(width: 6),
+                        SizedBox(width: spacing.xxs),
                         Text(
                           isValidPin
                               ? 'PIN Válido ($parsed)'
                               : 'Ingresa 2 dígitos (10..99)',
                           style: theme.textTheme.labelMedium?.copyWith(
                             color: isValidPin
-                                ? _uniguajiraGreen
-                                : theme.colorScheme.outline,
+                                ? colors.statusNormal
+                                : colors.outline,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -506,7 +507,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
+              SizedBox(height: spacing.xl),
 
               // Botón "Iniciar Emisión BLE"
               SizedBox(
@@ -521,23 +522,20 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: FilledButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                    shape: radii.buttonShape(),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing.md),
 
               // Nota de seguridad y protocolo
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: spacing.insetsSm,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(
+                  color: colors.primaryContainer.withValues(
                     alpha: 0.35,
                   ),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: radii.borderMd,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,16 +543,16 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                     Icon(
                       Icons.shield_outlined,
                       size: 20,
-                      color: theme.colorScheme.primary,
+                      color: colors.primary,
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: spacing.xs),
                     Expanded(
                       child: Text(
                         'Protocolo Seguro: Tu anuncio se firma con HMAC-SHA256 '
                         'rotativo de 30s. Solo el docente con la clave del curso '
                         'puede descifrar tu presencia.',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
+                          color: colors.onPrimaryContainer,
                           fontSize: 11.5,
                         ),
                       ),
@@ -573,7 +571,12 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
   // Paso 2: Emitiendo Beacon HMAC y Escuchando Eco Docente
   // ---------------------------------------------------------------------------
 
-  Widget _buildBroadcastingStep(ThemeData theme) {
+  Widget _buildBroadcastingStep(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final epochSeconds = _now.millisecondsSinceEpoch ~/ 1000;
     final elapsedInWindow = epochSeconds % AppConstants.hmacWindowSeconds;
     final secondsRemaining = AppConstants.hmacWindowSeconds - elapsedInWindow;
@@ -584,7 +587,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
         .padLeft(2, '0');
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: spacing.symmetric(horizontal: spacing.md, vertical: spacing.sm),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
@@ -600,21 +603,21 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                     height: 96,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                      color: colors.primary.withValues(alpha: 0.12),
                       border: Border.all(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.45),
+                        color: colors.primary.withValues(alpha: 0.45),
                         width: 3,
                       ),
                     ),
                     child: Icon(
                       Icons.sensors_rounded,
                       size: 48,
-                      color: theme.colorScheme.primary,
+                      color: colors.primary,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing.md),
 
               Text(
                 'Emitiendo Beacon Criptográfico',
@@ -623,32 +626,31 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: spacing.xxs),
               Text(
                 'Escuchando el Eco del Docente en el aula...',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: colors.onSurfaceMuted,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: spacing.lg),
 
               // Roster: Bit Asignado (#XX) y Código Estudiantil
               Card(
                 elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                color: colors.surfaceContainerHigh.withValues(
                   alpha: 0.6,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                shape: radii.cardShape(
                   side: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withValues(
+                    color: colors.outlineVariant.withValues(
                       alpha: 0.6,
                     ),
                   ),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: spacing.insetsMd,
                   child: Column(
                     children: <Widget>[
                       Row(
@@ -656,27 +658,27 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                         children: <Widget>[
                           // Bit asignado destacado
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
+                            padding: spacing.symmetric(
+                              horizontal: spacing.sm,
+                              vertical: spacing.xxs,
                             ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primary,
-                              borderRadius: BorderRadius.circular(10),
+                              color: colors.primary,
+                              borderRadius: radii.borderSm,
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: <Widget>[
-                                const Icon(
+                                Icon(
                                   Icons.tag_rounded,
                                   size: 18,
-                                  color: Colors.white,
+                                  color: colors.onPrimary,
                                 ),
-                                const SizedBox(width: 4),
+                                SizedBox(width: spacing.xxs),
                                 Text(
                                   'Bit #$bitIndexFormatted',
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: colors.onPrimary,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
                                   ),
@@ -686,29 +688,29 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                           ),
                           // PIN en uso
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+                            padding: spacing.symmetric(
+                              horizontal: spacing.xs,
+                              vertical: spacing.xxs,
                             ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(10),
+                              color: colors.primaryContainer,
+                              borderRadius: radii.borderSm,
                             ),
                             child: Text(
                               'PIN: $_sessionPin',
                               style: theme.textTheme.labelMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onPrimaryContainer,
+                                color: colors.onPrimaryContainer,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const Divider(height: 22),
+                      Divider(height: spacing.lg),
                       Row(
                         children: <Widget>[
                           const Icon(Icons.person_outline, size: 20),
-                          const SizedBox(width: 8),
+                          SizedBox(width: spacing.xs),
                           Expanded(
                             child: Text(
                               widget.enrollment.fullName,
@@ -719,11 +721,11 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: spacing.xxs),
                       Row(
                         children: <Widget>[
                           const Icon(Icons.badge_outlined, size: 20),
-                          const SizedBox(width: 8),
+                          SizedBox(width: spacing.xs),
                           Text(
                             'Código: ${widget.enrollment.studentCode}',
                             style: theme.textTheme.bodyMedium?.copyWith(
@@ -737,18 +739,18 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing.md),
 
               // Tarjeta de Cuenta Regresiva de la Ventana HMAC (30 segundos)
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: spacing.insetsMd,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(
+                  color: colors.primaryContainer.withValues(
                     alpha: 0.35,
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: radii.borderLg,
                   border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                    color: colors.primary.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Column(
@@ -762,15 +764,15 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                             Icon(
                               Icons.timer_outlined,
                               size: 18,
-                              color: theme.colorScheme.primary,
+                              color: colors.primary,
                             ),
-                            const SizedBox(width: 6),
+                            SizedBox(width: spacing.xxs),
                             Text(
                               'VENTANA HMAC ROTATIVA',
                               style: theme.textTheme.labelSmall?.copyWith(
                                 letterSpacing: 1.1,
                                 fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
+                                color: colors.primary,
                               ),
                             ),
                           ],
@@ -778,23 +780,23 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                         Text(
                           'Tick #$_currentTick',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.outline,
+                            color: colors.outline,
                             fontFamily: 'monospace',
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: spacing.sm),
                     LinearProgressIndicator(
                       value: progress,
                       minHeight: 8,
-                      backgroundColor: theme.colorScheme.primary.withValues(
+                      backgroundColor: colors.primary.withValues(
                         alpha: 0.15,
                       ),
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(4),
+                      color: colors.primary,
+                      borderRadius: radii.borderXs,
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: spacing.xs),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: <Widget>[
@@ -807,7 +809,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                         Text(
                           'Ventana: ${AppConstants.hmacWindowSeconds}s',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.outline,
+                            color: colors.outline,
                           ),
                         ),
                       ],
@@ -815,18 +817,18 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing.md),
 
               // UUID de 128 bits emitido en el anuncio BLE
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: spacing.insetsMd,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  color: colors.surfaceContainerHigh.withValues(
                     alpha: 0.5,
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: radii.borderLg,
                   border: Border.all(
-                    color: theme.colorScheme.outlineVariant.withValues(
+                    color: colors.outlineVariant.withValues(
                       alpha: 0.5,
                     ),
                   ),
@@ -842,7 +844,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                           style: theme.textTheme.labelSmall?.copyWith(
                             letterSpacing: 1,
                             fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
+                            color: colors.primary,
                           ),
                         ),
                         if (_currentEmittedUuid != null)
@@ -864,36 +866,36 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                           ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: spacing.xxs),
                     SelectableText(
                       _currentEmittedUuid ?? 'Calculando Service UUID...',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontFamily: 'monospace',
                         fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onSurface,
+                        color: colors.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: spacing.xxs),
                     Text(
                       'Payload de 16 bytes: [CourseHash:2][Flag+Bit:1][Pin:1][Tick:4][HMAC:8]',
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.outline,
+                        color: colors.outline,
                         fontSize: 10.5,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing.md),
 
               // Aviso si el hardware BLE no está disponible localmente
               if (_bleWarning != null) ...<Widget>[
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: spacing.insetsSm,
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.amber.shade300),
+                    color: colors.statusAlertaContainer,
+                    borderRadius: radii.borderMd,
+                    border: Border.all(color: colors.statusAlerta.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -901,22 +903,22 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                       Icon(
                         Icons.warning_amber_rounded,
                         size: 20,
-                        color: Colors.amber.shade900,
+                        color: colors.statusAlerta,
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: spacing.xs),
                       Expanded(
                         child: Text(
                           _bleWarning!,
                           style: TextStyle(
                             fontSize: 11.5,
-                            color: Colors.amber.shade900,
+                            color: colors.onStatusAlertaContainer,
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: spacing.md),
               ],
 
               // Botón discreto de simulación para pruebas de escritorio / QA
@@ -925,13 +927,14 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                 icon: const Icon(Icons.science_outlined, size: 20),
                 label: const Text('Simular Eco Docente (Demo/Test)'),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: spacing.insetsVSm,
+                  shape: radii.buttonShape(),
                   side: BorderSide(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                    color: colors.outline.withValues(alpha: 0.5),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: spacing.sm),
 
               // Botón para cancelar emisión y volver al paso 1
               TextButton.icon(
@@ -950,7 +953,12 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
   // Paso 3: SELLO CRIPTOGRÁFICO VERDE OFICIAL UNIGUAJIRA
   // ---------------------------------------------------------------------------
 
-  Widget _buildConfirmedStep(ThemeData theme) {
+  Widget _buildConfirmedStep(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final outcome = _confirmationOutcome;
     final verifyCode = outcome?.verifyCode ?? 'UG-00000000';
     final confirmedAt = _confirmedAt ?? DateTime.now();
@@ -962,7 +970,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
         .padLeft(2, '0');
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      padding: spacing.symmetric(horizontal: spacing.md, vertical: spacing.md),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
@@ -972,16 +980,16 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
               // Encabezado institucional del Sello Verde
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 28,
+                padding: spacing.symmetric(
+                  horizontal: spacing.md,
+                  vertical: spacing.lg,
                 ),
                 decoration: BoxDecoration(
-                  color: _uniguajiraGreen,
-                  borderRadius: BorderRadius.circular(24),
+                  color: colors.statusNormal,
+                  borderRadius: radii.borderXl,
                   boxShadow: <BoxShadow>[
                     BoxShadow(
-                      color: _uniguajiraGreen.withValues(alpha: 0.35),
+                      color: colors.statusNormal.withValues(alpha: 0.35),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
@@ -991,89 +999,89 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                   children: <Widget>[
                     // Ícono de verificación grande
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: spacing.insetsMd,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color: colors.onStatusNormal.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.verified_rounded,
                         size: 72,
-                        color: Colors.white,
+                        color: colors.onStatusNormal,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: spacing.md),
 
-                    const Text(
+                    Text(
                       'UNIVERSIDAD DE LA GUAJIRA',
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: colors.onStatusNormal.withValues(alpha: 0.8),
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 2,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    const Text(
+                    SizedBox(height: spacing.xxs),
+                    Text(
                       '¡ASISTENCIA REGISTRADA!',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: colors.onStatusNormal,
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: spacing.xxs),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
+                      padding: spacing.symmetric(
+                        horizontal: spacing.sm,
+                        vertical: spacing.xxs,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(20),
+                        color: colors.onStatusNormal.withValues(alpha: 0.18),
+                        borderRadius: radii.borderPill,
                       ),
-                      child: const Text(
+                      child: Text(
                         'SELLO CRIPTOGRÁFICO OFICIAL',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: colors.onStatusNormal,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 1.2,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: spacing.lg),
 
                     // Código de verificación auditable en grande (UG-XXXXXXXX)
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 12,
+                      padding: spacing.symmetric(
+                        horizontal: spacing.md,
+                        vertical: spacing.sm,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
+                        color: colors.surface,
+                        borderRadius: radii.borderMd,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           Text(
                             verifyCode,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 26,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 2.5,
-                              color: _uniguajiraGreen,
+                              color: colors.statusNormal,
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          SizedBox(width: spacing.xs),
                           IconButton(
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.copy_rounded,
                               size: 22,
-                              color: _uniguajiraGreen,
+                              color: colors.statusNormal,
                             ),
                             tooltip: 'Copiar código de verificación',
                             visualDensity: VisualDensity.compact,
@@ -1094,29 +1102,34 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
+                    SizedBox(height: spacing.xs),
+                    Text(
                       'Comprobante inmutable emitido por el Eco del Docente',
-                      style: TextStyle(color: Colors.white70, fontSize: 11),
+                      style: TextStyle(
+                        color: colors.onStatusNormal.withValues(alpha: 0.8),
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: spacing.md),
 
               // Detalle auditable de la asistencia
               Card(
                 elevation: 1,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
+                shape: radii.cardShape(
                   side: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withValues(
+                    color: colors.outlineVariant.withValues(
                       alpha: 0.5,
                     ),
                   ),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(18),
+                  padding: spacing.symmetric(
+                    horizontal: spacing.md,
+                    vertical: spacing.md,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -1126,67 +1139,67 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const Divider(height: 20),
+                      Divider(height: spacing.lg),
                       _buildDetailRow(
                         icon: Icons.person_outline,
                         label: 'Estudiante',
                         value: widget.enrollment.fullName,
-                        theme: theme,
+                        context: context,
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: spacing.sm),
                       _buildDetailRow(
                         icon: Icons.badge_outlined,
                         label: 'Código Estudiantil',
                         value: widget.enrollment.studentCode,
                         isMonospace: true,
-                        theme: theme,
+                        context: context,
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: spacing.sm),
                       _buildDetailRow(
                         icon: Icons.menu_book_rounded,
                         label: 'Asignatura',
                         value:
                             '${widget.enrollment.courseName} (${widget.enrollment.courseCode})',
-                        theme: theme,
+                        context: context,
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: spacing.sm),
                       _buildDetailRow(
                         icon: Icons.tag_rounded,
                         label: 'Posición en Mapa de Bits',
                         value: 'Bit #$bitIndexFormatted (Confirmado en 1)',
                         isHighlight: true,
-                        theme: theme,
+                        context: context,
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: spacing.sm),
                       _buildDetailRow(
                         icon: Icons.access_time_rounded,
                         label: 'Hora Exacta',
                         value: formattedDate,
-                        theme: theme,
+                        context: context,
                       ),
                       if (outcome?.sessionPin != null) ...<Widget>[
-                        const SizedBox(height: 12),
+                        SizedBox(height: spacing.sm),
                         _buildDetailRow(
                           icon: Icons.pin_outlined,
                           label: 'PIN del Aula',
                           value: '${outcome!.sessionPin}',
-                          theme: theme,
+                          context: context,
                         ),
                       ],
                       if (outcome?.rssi != null) ...<Widget>[
-                        const SizedBox(height: 12),
+                        SizedBox(height: spacing.sm),
                         _buildDetailRow(
                           icon: Icons.signal_cellular_alt_rounded,
                           label: 'Potencia RSSI',
                           value: '${outcome!.rssi} dBm (Proximidad aceptada)',
-                          theme: theme,
+                          context: context,
                         ),
                       ],
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: spacing.lg),
 
               // Botones de acción final
               Row(
@@ -1213,14 +1226,12 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                       icon: const Icon(Icons.share_outlined),
                       label: const Text('Copiar'),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        padding: spacing.insetsVMd,
+                        shape: radii.buttonShape(),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: spacing.sm),
                   Expanded(
                     flex: 2,
                     child: FilledButton.icon(
@@ -1228,11 +1239,10 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                       icon: const Icon(Icons.check_rounded),
                       label: const Text('Volver a Mis Cursos'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: _uniguajiraGreen,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        backgroundColor: colors.statusNormal,
+                        foregroundColor: colors.onStatusNormal,
+                        padding: spacing.insetsVMd,
+                        shape: radii.buttonShape(),
                       ),
                     ),
                   ),
@@ -1249,40 +1259,44 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
   // Componentes Auxiliares
   // ---------------------------------------------------------------------------
 
-  Widget _buildCourseSummaryCard(ThemeData theme) {
+  Widget _buildCourseSummaryCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final bitIndexFormatted = widget.enrollment.bitIndex
         .toString()
         .padLeft(2, '0');
 
     return Card(
       elevation: 0,
-      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+      color: colors.primaryContainer.withValues(alpha: 0.35),
+      shape: radii.cardShape(
         side: BorderSide(
-          color: theme.colorScheme.primary.withValues(alpha: 0.25),
+          color: colors.primary.withValues(alpha: 0.25),
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: spacing.insetsMd,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Row(
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: spacing.insetsXs,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    borderRadius: BorderRadius.circular(10),
+                    color: colors.primary,
+                    borderRadius: radii.borderSm,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.school_rounded,
-                    color: Colors.white,
+                    color: colors.onPrimary,
                     size: 20,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: spacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1296,7 +1310,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                       Text(
                         'Código: ${widget.enrollment.courseCode}',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.outline,
+                          color: colors.outline,
                         ),
                       ),
                     ],
@@ -1304,7 +1318,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                 ),
               ],
             ),
-            const Divider(height: 20),
+            Divider(height: spacing.md),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
@@ -1321,24 +1335,24 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                       'Código: ${widget.enrollment.studentCode}',
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontFamily: 'monospace',
-                        color: theme.colorScheme.outline,
+                        color: colors.outline,
                       ),
                     ),
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
+                  padding: spacing.symmetric(
+                    horizontal: spacing.xs,
+                    vertical: spacing.xxs,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    borderRadius: BorderRadius.circular(8),
+                    color: colors.primary,
+                    borderRadius: radii.borderSm,
                   ),
                   child: Text(
                     'Bit #$bitIndexFormatted',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: colors.onPrimary,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1356,19 +1370,23 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
     required IconData icon,
     required String label,
     required String value,
-    required ThemeData theme,
+    required BuildContext context,
     bool isMonospace = false,
     bool isHighlight = false,
   }) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Icon(
           icon,
           size: 18,
-          color: isHighlight ? _uniguajiraGreen : theme.colorScheme.primary,
+          color: isHighlight ? colors.statusNormal : colors.primary,
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: spacing.xs),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1376,16 +1394,16 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
               Text(
                 label,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.outline,
+                  color: colors.outline,
                 ),
               ),
-              const SizedBox(height: 1),
+              SizedBox(height: spacing.xxs / 2),
               Text(
                 value,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontFamily: isMonospace ? 'monospace' : null,
                   fontWeight: isHighlight ? FontWeight.bold : FontWeight.w500,
-                  color: isHighlight ? _uniguajiraGreen : null,
+                  color: isHighlight ? colors.statusNormal : null,
                 ),
               ),
             ],
