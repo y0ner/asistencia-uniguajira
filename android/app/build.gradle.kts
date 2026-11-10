@@ -28,6 +28,11 @@ android {
         versionName = flutter.versionName
     }
 
+    buildFeatures {
+        // Necesario en AGP 8+ para usar resValue("string", "app_name", …) en los flavors.
+        resValues = true
+    }
+
     flavorDimensions += "rol"
     productFlavors {
         create("docente") {
