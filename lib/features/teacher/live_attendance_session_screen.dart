@@ -10,6 +10,7 @@ import '../../core/models/student_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/attendance_session_controller.dart';
 import '../../data/services/ble_attendance_service.dart';
+import '../../theme/theme.dart';
 import 'signed_acta_dialog.dart';
 
 /// Pantalla de Sesión de Asistencia Docente en Vivo:
@@ -288,38 +289,45 @@ class _LiveAttendanceSessionScreenState
       if (outcome.isAccepted) {
         await _reloadRecords();
         if (!mounted) return;
+        final colors = AppColors.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               '¡Llegada BLE confirmada! ${student.fullName} (Bit #${student.bitIndex.toString().padLeft(2, '0')}) '
               'Token: ${outcome.verifyCode}',
             ),
-            backgroundColor: Colors.green.shade800,
+            backgroundColor: colors.statusNormal,
             duration: const Duration(seconds: 4),
           ),
         );
       } else {
+        final colors = AppColors.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               'Rechazo criptográfico: ${outcome.failureReason ?? "Firma no válida"}',
             ),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            backgroundColor: colors.statusPerdida,
           ),
         );
       }
     } catch (e) {
       if (!mounted) return;
+      final colors = AppColors.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al simular llegada BLE: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: colors.statusPerdida,
         ),
       );
     }
   }
 
   void _openSimulationPicker() {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final pendingStudents = _students
         .where((StudentModel s) => !_recordsByStudentId.containsKey(s.id))
         .toList(growable: false);
@@ -327,37 +335,36 @@ class _LiveAttendanceSessionScreenState
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: radii.modalShape(),
       builder: (BuildContext ctx) {
         final theme = Theme.of(ctx);
 
         if (pendingStudents.isEmpty) {
           return Padding(
-            padding: const EdgeInsets.all(24),
+            padding: spacing.insetsLg,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                const Icon(
+                Icon(
                   Icons.check_circle_outline,
-                  color: Colors.green,
+                  color: colors.statusNormal,
                   size: 48,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: spacing.sm),
                 Text(
                   'Todos los estudiantes están presentes',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: spacing.xs),
                 const Text(
                   'No hay estudiantes pendientes por detectar en esta sesión.',
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: spacing.md),
                 FilledButton(
+                  style: FilledButton.styleFrom(shape: radii.buttonShape()),
                   onPressed: () => Navigator.of(ctx).pop(),
                   child: const Text('Cerrar'),
                 ),
@@ -368,15 +375,15 @@ class _LiveAttendanceSessionScreenState
 
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            padding: spacing.symmetric(horizontal: spacing.md, vertical: spacing.lg),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    Icon(Icons.science, color: theme.colorScheme.primary),
-                    const SizedBox(width: 8),
+                    Icon(Icons.science, color: colors.primary),
+                    SizedBox(width: spacing.xs),
                     Text(
                       'Simulador de Anuncio BLE',
                       style: theme.textTheme.titleMedium?.copyWith(
@@ -390,14 +397,14 @@ class _LiveAttendanceSessionScreenState
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: spacing.xxs),
                 Text(
                   'Selecciona un estudiante para inyectar su paquete de 16 bytes firmado con su clave HMAC real (RSSI: -62 dBm).',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: colors.onSurfaceMuted,
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: spacing.sm),
                 // Botón rápido para simular el primer pendiente
                 SizedBox(
                   width: double.infinity,
@@ -411,11 +418,13 @@ class _LiveAttendanceSessionScreenState
                       'Simular Primero: ${pendingStudents.first.fullName}',
                     ),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green.shade700,
+                      backgroundColor: colors.statusNormal,
+                      foregroundColor: colors.onStatusNormal,
+                      shape: radii.buttonShape(),
                     ),
                   ),
                 ),
-                const Divider(height: 24),
+                Divider(height: spacing.lg),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 320),
                   child: ListView.separated(
@@ -430,13 +439,13 @@ class _LiveAttendanceSessionScreenState
                         dense: true,
                         leading: CircleAvatar(
                           radius: 14,
-                          backgroundColor: theme.colorScheme.primaryContainer,
+                          backgroundColor: colors.primaryContainer,
                           child: Text(
                             bitPadded,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onPrimaryContainer,
+                              color: colors.onPrimaryContainer,
                             ),
                           ),
                         ),
@@ -453,9 +462,10 @@ class _LiveAttendanceSessionScreenState
                           icon: const Icon(Icons.sensors, size: 16),
                           label: const Text('Simular'),
                           style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+                            shape: radii.buttonShape(),
+                            padding: spacing.symmetric(
+                              horizontal: spacing.xs,
+                              vertical: spacing.xxs,
                             ),
                           ),
                         ),
@@ -503,10 +513,10 @@ class _LiveAttendanceSessionScreenState
               ),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: AppSpacing.of(context).insetsSm,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.of(context).surfaceContainerHigh,
+                  borderRadius: AppRadii.of(context).borderSm,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -529,7 +539,7 @@ class _LiveAttendanceSessionScreenState
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF0033A0),
+                shape: AppRadii.of(context).buttonShape(),
               ),
               child: const Text('Cerrar y Firmar Acta'),
             ),
@@ -577,20 +587,24 @@ class _LiveAttendanceSessionScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     if (_isStarting) {
       return Scaffold(
         appBar: AppBar(
           title: Text('Sesión BLE: ${widget.course.name}'),
-          backgroundColor: const Color(0xFF0033A0),
-          foregroundColor: Colors.white,
+          backgroundColor: colors.primary,
+          foregroundColor: colors.onPrimary,
         ),
-        body: const Center(
+        body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text(
+              const CircularProgressIndicator(),
+              SizedBox(height: spacing.md),
+              const Text(
                 'Inicializando Radar BLE y Mapa de Bits...',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
@@ -604,27 +618,28 @@ class _LiveAttendanceSessionScreenState
       return Scaffold(
         appBar: AppBar(
           title: Text(widget.course.name),
-          backgroundColor: const Color(0xFF0033A0),
-          foregroundColor: Colors.white,
+          backgroundColor: colors.primary,
+          foregroundColor: colors.onPrimary,
         ),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: spacing.insetsLg,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
-                const SizedBox(height: 16),
+                Icon(Icons.error_outline, size: 48, color: colors.statusPerdida),
+                SizedBox(height: spacing.md),
                 Text(
                   'Error al iniciar sesión',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: spacing.xs),
                 Text(_initError!, textAlign: TextAlign.center),
-                const SizedBox(height: 16),
+                SizedBox(height: spacing.md),
                 FilledButton(
+                  style: FilledButton.styleFrom(shape: radii.buttonShape()),
                   onPressed: _initializeSession,
                   child: const Text('Reintentar'),
                 ),
@@ -684,8 +699,8 @@ class _LiveAttendanceSessionScreenState
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.course.name),
-          backgroundColor: const Color(0xFF0033A0),
-          foregroundColor: Colors.white,
+          backgroundColor: colors.primary,
+          foregroundColor: colors.onPrimary,
           actions: <Widget>[
             IconButton(
               icon: const Icon(Icons.refresh),
@@ -710,12 +725,12 @@ class _LiveAttendanceSessionScreenState
 
             // TabBar con las dos pestañas principales
             Container(
-              color: theme.colorScheme.surface,
+              color: colors.surface,
               child: TabBar(
                 controller: _tabController,
-                indicatorColor: const Color(0xFF0033A0),
-                labelColor: const Color(0xFF0033A0),
-                unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+                indicatorColor: colors.primary,
+                labelColor: colors.primary,
+                unselectedLabelColor: colors.onSurfaceMuted,
                 tabs: <Widget>[
                   Tab(
                     icon: const Icon(Icons.sensors),
@@ -761,16 +776,20 @@ class _LiveAttendanceSessionScreenState
     required int totalPresent,
     required int totalEnrolled,
   }) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final active = _controller.state;
     final bleWarning = _controller.bleWarning;
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: colors.surface,
         border: Border(
           bottom: BorderSide(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+            color: colors.outlineVariant,
           ),
         ),
       ),
@@ -780,18 +799,18 @@ class _LiveAttendanceSessionScreenState
           if (bleWarning != null && bleWarning.isNotEmpty)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              color: Colors.amber.shade100,
+              padding: spacing.symmetric(horizontal: spacing.md, vertical: spacing.xxs),
+              color: colors.statusAlertaContainer,
               child: Row(
                 children: <Widget>[
-                  Icon(Icons.warning_amber, size: 16, color: Colors.amber.shade900),
-                  const SizedBox(width: 8),
+                  Icon(Icons.warning_amber, size: 16, color: colors.statusAlerta),
+                  SizedBox(width: spacing.xs),
                   Expanded(
                     child: Text(
                       bleWarning,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.amber.shade900,
+                        color: colors.onStatusAlertaContainer,
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
@@ -803,22 +822,22 @@ class _LiveAttendanceSessionScreenState
             ),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: spacing.fromLTRB(spacing.md, spacing.sm, spacing.md, spacing.sm),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 // PIN Verbal de Aula en Grande y Llamativo
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
+                  padding: spacing.symmetric(
+                    horizontal: spacing.md,
+                    vertical: spacing.sm,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0033A0),
-                    borderRadius: BorderRadius.circular(16),
+                    color: colors.primary,
+                    borderRadius: radii.borderLg,
                     boxShadow: <BoxShadow>[
                       BoxShadow(
-                        color: const Color(0xFF0033A0).withValues(alpha: 0.3),
+                        color: colors.primary.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -829,17 +848,17 @@ class _LiveAttendanceSessionScreenState
                     children: <Widget>[
                       Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const <Widget>[
+                        children: <Widget>[
                           Icon(
                             Icons.record_voice_over,
-                            color: Colors.white70,
+                            color: colors.onPrimary.withValues(alpha: 0.7),
                             size: 14,
                           ),
-                          SizedBox(width: 4),
+                          SizedBox(width: spacing.xxs),
                           Text(
                             'PIN DE AULA',
                             style: TextStyle(
-                              color: Colors.white70,
+                              color: colors.onPrimary.withValues(alpha: 0.7),
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.8,
@@ -847,28 +866,28 @@ class _LiveAttendanceSessionScreenState
                           ),
                         ],
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: spacing.xxs / 2),
                       Text(
                         pinStr,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: colors.onPrimary,
                           fontSize: 34,
                           fontWeight: FontWeight.w900,
                           fontFamily: 'monospace',
                           letterSpacing: 2,
                         ),
                       ),
-                      const Text(
+                      Text(
                         'Dilo en voz alta',
                         style: TextStyle(
-                          color: Colors.white60,
+                          color: colors.onPrimary.withValues(alpha: 0.6),
                           fontSize: 9,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 14),
+                SizedBox(width: spacing.sm),
 
                 // Visualizador del Mapa de Bits de 64 posiciones en tiempo real
                 Expanded(
@@ -891,13 +910,13 @@ class _LiveAttendanceSessionScreenState
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: totalPresent > 0
-                                  ? Colors.green.shade700
-                                  : theme.colorScheme.onSurfaceVariant,
+                                  ? colors.statusNormal
+                                  : colors.onSurfaceMuted,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: spacing.xxs),
                       // Cuadrícula compacta de 64 celdas (4 filas x 16 columnas)
                       _buildBitmapGrid(active, theme),
                     ],
@@ -909,12 +928,12 @@ class _LiveAttendanceSessionScreenState
 
           // Barra de Contadores en vivo
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: spacing.symmetric(horizontal: spacing.md, vertical: spacing.xs),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+              color: colors.surfaceContainerLow,
               border: Border(
                 top: BorderSide(
-                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                  color: colors.outlineVariant,
                 ),
               ),
             ),
@@ -924,25 +943,25 @@ class _LiveAttendanceSessionScreenState
                 _buildLiveBadge(
                   label: 'BLE',
                   count: presentBleCount,
-                  color: Colors.green.shade700,
+                  color: colors.statusNormal,
                   icon: Icons.bluetooth_connected,
                 ),
                 _buildLiveBadge(
                   label: 'Manual',
                   count: presentManualCount,
-                  color: Colors.orange.shade800,
+                  color: colors.manualAccent,
                   icon: Icons.touch_app,
                 ),
                 _buildLiveBadge(
                   label: 'Pendientes',
                   count: absentCount,
-                  color: Colors.red.shade700,
+                  color: colors.statusPerdida,
                   icon: Icons.person_off,
                 ),
                 _buildLiveBadge(
                   label: 'Total',
                   countStr: '$totalPresent / $totalEnrolled',
-                  color: const Color(0xFF0033A0),
+                  color: colors.primary,
                   icon: Icons.groups,
                 ),
               ],
@@ -954,15 +973,18 @@ class _LiveAttendanceSessionScreenState
   }
 
   Widget _buildBitmapGrid(ActiveCourseSessionState? active, ThemeData theme) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
     final bitmap8 = active?.bitmap8;
 
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: spacing.insetsXxs,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(8),
+        color: colors.surfaceContainerLow,
+        borderRadius: radii.borderSm,
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+          color: colors.outlineVariant,
         ),
       ),
       child: Column(
@@ -977,9 +999,9 @@ class _LiveAttendanceSessionScreenState
 
               Color cellColor;
               if (isSet) {
-                cellColor = Colors.green.shade600;
+                cellColor = colors.statusNormal;
               } else if (isEnrolled) {
-                cellColor = theme.colorScheme.surfaceContainerHighest;
+                cellColor = colors.surfaceContainerHigh;
               } else {
                 cellColor = Colors.transparent;
               }
@@ -994,16 +1016,16 @@ class _LiveAttendanceSessionScreenState
                 child: Container(
                   width: 14,
                   height: 14,
-                  margin: const EdgeInsets.all(1),
+                  margin: spacing.all(1),
                   decoration: BoxDecoration(
                     color: cellColor,
-                    borderRadius: BorderRadius.circular(3),
+                    borderRadius: radii.borderXs,
                     border: Border.all(
                       color: isSet
-                          ? Colors.green.shade800
+                          ? colors.statusNormal
                           : (isEnrolled
-                              ? Colors.grey.shade400
-                              : Colors.grey.shade300),
+                              ? colors.outline
+                              : colors.outlineVariant),
                       width: 0.6,
                     ),
                   ),
@@ -1014,8 +1036,8 @@ class _LiveAttendanceSessionScreenState
                       fontSize: 7,
                       fontWeight: FontWeight.bold,
                       color: isSet
-                          ? Colors.white
-                          : (isEnrolled ? Colors.black87 : Colors.grey.shade400),
+                          ? colors.onStatusNormal
+                          : (isEnrolled ? colors.onSurface : colors.outlineVariant),
                     ),
                   ),
                 ),
@@ -1034,17 +1056,19 @@ class _LiveAttendanceSessionScreenState
     required Color color,
     required IconData icon,
   }) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
     final displayValue = countStr ?? count.toString();
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         Icon(icon, size: 14, color: color),
-        const SizedBox(width: 4),
+        SizedBox(width: spacing.xxs),
         Text(
           '$label: ',
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey.shade700,
+            color: colors.onSurfaceMuted,
           ),
         ),
         Text(
@@ -1064,21 +1088,25 @@ class _LiveAttendanceSessionScreenState
   // ---------------------------------------------------------------------------
 
   Widget _buildRadarBleTab(ThemeData theme) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final bleStudents = _students.where((StudentModel s) {
       final r = _recordsByStudentId[s.id];
       return r != null && r.method == AppConstants.attendanceMethodBleHmac;
     }).toList(growable: false);
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: spacing.insetsMd,
       children: <Widget>[
         // Tarjeta de Radar Activo
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: spacing.insetsMd,
           decoration: BoxDecoration(
-            color: Colors.green.shade50,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.green.shade300),
+            color: colors.statusNormalContainer.withValues(alpha: 0.35),
+            borderRadius: radii.borderMd,
+            border: Border.all(color: colors.statusNormal.withValues(alpha: 0.4)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1086,35 +1114,35 @@ class _LiveAttendanceSessionScreenState
               Row(
                 children: <Widget>[
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: spacing.insetsXs,
                     decoration: BoxDecoration(
-                      color: Colors.green.shade600,
+                      color: colors.statusNormal,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.sensors,
-                      color: Colors.white,
+                      color: colors.onStatusNormal,
                       size: 20,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: spacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        const Text(
+                        Text(
                           'Radar BLE Activo',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: Colors.black87,
+                            color: colors.onSurface,
                           ),
                         ),
                         Text(
                           'Emitiendo Eco (16 bytes) y escuchando Beacons (RSSI >= -75 dBm)',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.green.shade900,
+                            color: colors.onStatusNormalContainer,
                           ),
                         ),
                       ],
@@ -1122,7 +1150,7 @@ class _LiveAttendanceSessionScreenState
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: spacing.sm),
               // Botón para Simular Llegada BLE
               SizedBox(
                 width: double.infinity,
@@ -1131,17 +1159,16 @@ class _LiveAttendanceSessionScreenState
                   icon: const Icon(Icons.bolt),
                   label: const Text('Simular Llegada BLE (Demo/Test)'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.green.shade800,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    backgroundColor: colors.statusNormal,
+                    foregroundColor: colors.onStatusNormal,
+                    shape: radii.buttonShape(),
                   ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: spacing.md),
 
         // Encabezado de la lista
         Row(
@@ -1156,12 +1183,12 @@ class _LiveAttendanceSessionScreenState
             Text(
               'Criptografía HMAC-SHA256',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: colors.onSurfaceMuted,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: spacing.xs),
 
         if (bleStudents.isEmpty)
           _buildEmptyBleView(theme)
@@ -1175,33 +1202,36 @@ class _LiveAttendanceSessionScreenState
   }
 
   Widget _buildEmptyBleView(ThemeData theme) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+      padding: spacing.symmetric(vertical: spacing.xl, horizontal: spacing.lg),
       alignment: Alignment.center,
       child: Column(
         children: <Widget>[
           Icon(
             Icons.radar,
             size: 54,
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            color: colors.onSurfaceMuted.withValues(alpha: 0.5),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: spacing.sm),
           Text(
             'Esperando anuncios BLE de estudiantes',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: spacing.xxs),
           Text(
             'Pide a los estudiantes ingresar el PIN del aula en su app. '
             'Aparecerán aquí con su token UG-XXXXXXXX una vez confirmados.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: colors.onSurfaceMuted,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: spacing.sm),
           TextButton.icon(
             onPressed: _openSimulationPicker,
             icon: const Icon(Icons.science_outlined),
@@ -1217,39 +1247,42 @@ class _LiveAttendanceSessionScreenState
     StudentModel student,
     AttendanceRecordModel? record,
   ) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final bitPadded = student.bitIndex.toString().padLeft(2, '0');
     final rssiInt = record?.rssiAvg?.round() ?? -60;
     final token = record?.hmacTag ?? 'UG-????????';
 
     return Card(
       elevation: 0,
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.green.shade200),
+      margin: spacing.only(bottom: spacing.xs),
+      shape: radii.cardShape(
+        side: BorderSide(color: colors.statusNormal.withValues(alpha: 0.3)),
       ),
-      color: Colors.green.shade50.withValues(alpha: 0.4),
+      color: colors.statusNormalContainer.withValues(alpha: 0.25),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: spacing.insetsSm,
         child: Row(
           children: <Widget>[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
               decoration: BoxDecoration(
-                color: Colors.green.shade700,
-                borderRadius: BorderRadius.circular(8),
+                color: colors.statusNormal,
+                borderRadius: radii.borderSm,
               ),
               child: Text(
                 '#$bitPadded',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: colors.onStatusNormal,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'monospace',
                   fontSize: 12,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: spacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1263,7 +1296,7 @@ class _LiveAttendanceSessionScreenState
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
+                  SizedBox(height: spacing.xxs / 2),
                   Row(
                     children: <Widget>[
                       Text(
@@ -1272,19 +1305,19 @@ class _LiveAttendanceSessionScreenState
                           fontFamily: 'monospace',
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.primary,
+                          color: colors.primary,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      SizedBox(width: spacing.xs),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
+                        padding: spacing.symmetric(
+                          horizontal: spacing.xxs + 2,
+                          vertical: spacing.xxs / 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.green.shade300),
+                          color: colors.surface,
+                          borderRadius: radii.borderXs,
+                          border: Border.all(color: colors.statusNormal.withValues(alpha: 0.3)),
                         ),
                         child: Text(
                           token,
@@ -1292,7 +1325,7 @@ class _LiveAttendanceSessionScreenState
                             fontFamily: 'monospace',
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: Colors.green.shade900,
+                            color: colors.statusNormal,
                           ),
                         ),
                       ),
@@ -1311,10 +1344,10 @@ class _LiveAttendanceSessionScreenState
                       Icons.signal_cellular_alt,
                       size: 14,
                       color: rssiInt >= -65
-                          ? Colors.green.shade800
-                          : Colors.orange.shade800,
+                          ? colors.statusNormal
+                          : colors.statusAlerta,
                     ),
-                    const SizedBox(width: 2),
+                    SizedBox(width: spacing.xxs / 2),
                     Text(
                       '$rssiInt dBm',
                       style: TextStyle(
@@ -1322,26 +1355,28 @@ class _LiveAttendanceSessionScreenState
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: rssiInt >= -65
-                            ? Colors.green.shade800
-                            : Colors.orange.shade800,
+                            ? colors.statusNormal
+                            : colors.statusAlerta,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: spacing.xxs / 2),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: spacing.symmetric(
+                    horizontal: spacing.xxs + 2,
+                    vertical: spacing.xxs / 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade100,
-                    borderRadius: BorderRadius.circular(4),
+                    color: colors.statusNormalContainer,
+                    borderRadius: radii.borderXs,
                   ),
                   child: Text(
                     'BLE OK',
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.bold,
-                      color: Colors.green.shade900,
+                      color: colors.onStatusNormalContainer,
                     ),
                   ),
                 ),
@@ -1358,6 +1393,9 @@ class _LiveAttendanceSessionScreenState
   // ---------------------------------------------------------------------------
 
   Widget _buildInvertedListTab(ThemeData theme) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
     final query = _searchQuery.trim().toLowerCase();
 
     // Filtramos estudiantes según búsqueda rápida
@@ -1377,33 +1415,33 @@ class _LiveAttendanceSessionScreenState
         .toList(growable: false);
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: spacing.insetsMd,
       children: <Widget>[
         // Mensaje descriptivo de la lista invertida
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xs),
           decoration: BoxDecoration(
-            color: Colors.orange.shade50,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.orange.shade200),
+            color: colors.manualAccentContainer.withValues(alpha: 0.35),
+            borderRadius: radii.borderSm,
+            border: Border.all(color: colors.manualAccent.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: <Widget>[
-              Icon(Icons.touch_app, size: 20, color: Colors.orange.shade800),
-              const SizedBox(width: 8),
+              Icon(Icons.touch_app, size: 20, color: colors.manualAccent),
+              SizedBox(width: spacing.xs),
               Expanded(
                 child: Text(
                   'Marca a los alumnos sin celular o con batería descargada con un solo toque.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.orange.shade900,
+                    color: colors.onManualAccentContainer,
                   ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: spacing.sm),
 
         // Buscador Rápido por Nombre o Código
         TextField(
@@ -1423,61 +1461,61 @@ class _LiveAttendanceSessionScreenState
                 : null,
             isDense: true,
             filled: true,
-            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            fillColor: colors.surfaceContainerHigh.withValues(alpha: 0.3),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: radii.borderSm,
               borderSide: BorderSide(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                color: colors.outlineVariant.withValues(alpha: 0.6),
               ),
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: spacing.md),
 
         // SECCIÓN 1: PENDIENTES / SIN BLE (Muestra en la parte superior)
         Row(
           children: <Widget>[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs / 2),
               decoration: BoxDecoration(
-                color: Colors.red.shade100,
-                borderRadius: BorderRadius.circular(6),
+                color: colors.statusPerdidaContainer,
+                borderRadius: radii.borderXs,
               ),
               child: Text(
                 'PENDIENTES (${pending.length})',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: Colors.red.shade900,
+                  color: colors.onStatusPerdidaContainer,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: spacing.xs),
             Text(
               'No detectados por BLE',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: colors.onSurfaceMuted,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: spacing.xs),
 
         if (pending.isEmpty)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: spacing.insetsMd,
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(10),
+              color: colors.surfaceContainerLow,
+              borderRadius: radii.borderSm,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: const <Widget>[
-                Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
-                SizedBox(width: 8),
+              children: <Widget>[
+                Icon(Icons.check_circle_outline, color: colors.statusNormal, size: 18),
+                SizedBox(width: spacing.xs),
                 Text(
                   'No hay estudiantes pendientes en este grupo.',
-                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                  style: TextStyle(fontSize: 12, color: colors.onSurfaceMuted),
                 ),
               ],
             ),
@@ -1487,43 +1525,43 @@ class _LiveAttendanceSessionScreenState
             return _buildPendingStudentTile(theme, student);
           }),
 
-        const SizedBox(height: 24),
+        SizedBox(height: spacing.lg),
 
         // SECCIÓN 2: YA CONFIRMADOS (BLE O MANUAL)
         Row(
           children: <Widget>[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs / 2),
               decoration: BoxDecoration(
-                color: Colors.green.shade100,
-                borderRadius: BorderRadius.circular(6),
+                color: colors.statusNormalContainer,
+                borderRadius: radii.borderXs,
               ),
               child: Text(
                 'REGISTRADOS (${confirmed.length})',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: Colors.green.shade900,
+                  color: colors.onStatusNormalContainer,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: spacing.xs),
             Text(
               'Presentes en el Bitmap',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: colors.onSurfaceMuted,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: spacing.xs),
 
         if (confirmed.isEmpty)
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: spacing.insetsSm,
             child: Text(
               'Aún no hay alumnos confirmados.',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: colors.onSurfaceMuted),
             ),
           )
         else
@@ -1536,26 +1574,28 @@ class _LiveAttendanceSessionScreenState
   }
 
   Widget _buildPendingStudentTile(ThemeData theme, StudentModel student) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
     final bitPadded = student.bitIndex.toString().padLeft(2, '0');
 
     return Card(
       elevation: 0,
-      margin: const EdgeInsets.only(bottom: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
+      margin: spacing.only(bottom: spacing.xxs + 2),
+      shape: radii.cardShape(
         side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+          color: colors.outlineVariant.withValues(alpha: 0.6),
         ),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        contentPadding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xxs / 2),
         leading: Container(
           width: 44,
           height: 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(6),
+            color: colors.surfaceContainerHigh,
+            borderRadius: radii.borderXs,
           ),
           child: Text(
             '#$bitPadded',
@@ -1575,7 +1615,7 @@ class _LiveAttendanceSessionScreenState
           style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 11,
-            color: theme.colorScheme.onSurfaceVariant,
+            color: colors.onSurfaceMuted,
           ),
         ),
         trailing: Row(
@@ -1589,12 +1629,10 @@ class _LiveAttendanceSessionScreenState
             FilledButton.tonal(
               onPressed: () => _handleToggleManual(student, true),
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.orange.shade100,
-                foregroundColor: Colors.orange.shade900,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                backgroundColor: colors.manualAccentContainer,
+                foregroundColor: colors.onManualAccentContainer,
+                padding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xs),
+                shape: radii.buttonShape(),
               ),
               child: const Text(
                 'Presente',
@@ -1612,38 +1650,42 @@ class _LiveAttendanceSessionScreenState
     StudentModel student,
     AttendanceRecordModel? record,
   ) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
     final isBle = record?.method == AppConstants.attendanceMethodBleHmac;
     final bitPadded = student.bitIndex.toString().padLeft(2, '0');
 
     return Card(
       elevation: 0,
-      margin: const EdgeInsets.only(bottom: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
+      margin: spacing.only(bottom: spacing.xxs + 2),
+      shape: radii.cardShape(
         side: BorderSide(
-          color: isBle ? Colors.green.shade200 : Colors.orange.shade200,
+          color: isBle
+              ? colors.statusNormal.withValues(alpha: 0.3)
+              : colors.manualAccent.withValues(alpha: 0.3),
         ),
       ),
       color: isBle
-          ? Colors.green.shade50.withValues(alpha: 0.3)
-          : Colors.orange.shade50.withValues(alpha: 0.3),
+          ? colors.statusNormalContainer.withValues(alpha: 0.2)
+          : colors.manualAccentContainer.withValues(alpha: 0.2),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        contentPadding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xxs / 2),
         leading: Container(
           width: 44,
           height: 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isBle ? Colors.green.shade700 : Colors.orange.shade700,
-            borderRadius: BorderRadius.circular(6),
+            color: isBle ? colors.statusNormal : colors.manualAccent,
+            borderRadius: radii.borderXs,
           ),
           child: Text(
             '#$bitPadded',
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
               fontFamily: 'monospace',
               fontSize: 12,
-              color: Colors.white,
+              color: colors.onPrimary,
             ),
           ),
         ),
@@ -1657,31 +1699,31 @@ class _LiveAttendanceSessionScreenState
               'Cód: ${student.studentCode}',
               style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: spacing.xs),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              padding: spacing.symmetric(horizontal: spacing.xxs + 2, vertical: spacing.xxs / 4),
               decoration: BoxDecoration(
-                color: isBle ? Colors.green.shade100 : Colors.orange.shade100,
-                borderRadius: BorderRadius.circular(4),
+                color: isBle ? colors.statusNormalContainer : colors.manualAccentContainer,
+                borderRadius: radii.borderXs,
               ),
               child: Text(
                 isBle ? 'BLE' : 'MANUAL',
                 style: TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
-                  color: isBle ? Colors.green.shade900 : Colors.orange.shade900,
+                  color: isBle ? colors.onStatusNormalContainer : colors.onManualAccentContainer,
                 ),
               ),
             ),
             if (record?.observation != null) ...<Widget>[
-              const SizedBox(width: 6),
+              SizedBox(width: spacing.xxs + 2),
               Expanded(
                 child: Text(
                   '(${record!.observation!})',
                   style: TextStyle(
                     fontSize: 10,
                     fontStyle: FontStyle.italic,
-                    color: Colors.grey.shade700,
+                    color: colors.onSurfaceMuted,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1691,17 +1733,14 @@ class _LiveAttendanceSessionScreenState
           ],
         ),
         trailing: isBle
-            ? const Icon(Icons.check_circle, color: Colors.green, size: 22)
+            ? Icon(Icons.check_circle, color: colors.statusNormal, size: 22)
             : OutlinedButton(
                 onPressed: () => _handleToggleManual(student, false),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade700,
-                  side: BorderSide(color: Colors.red.shade300),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
+                  foregroundColor: colors.statusPerdida,
+                  side: BorderSide(color: colors.statusPerdida.withValues(alpha: 0.4)),
+                  padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
+                  shape: radii.buttonShape(),
                 ),
                 child: const Text('Desmarcar', style: TextStyle(fontSize: 11)),
               ),
@@ -1714,13 +1753,17 @@ class _LiveAttendanceSessionScreenState
   // ---------------------------------------------------------------------------
 
   Widget _buildBottomActionBar(ThemeData theme) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: spacing.fromLTRB(spacing.md, spacing.sm, spacing.md, spacing.md),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: colors.surface,
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: colors.onSurface.withValues(alpha: 0.05),
             offset: const Offset(0, -2),
             blurRadius: 8,
           ),
@@ -1733,12 +1776,12 @@ class _LiveAttendanceSessionScreenState
           child: FilledButton.icon(
             onPressed: _isClosing ? null : _handleCloseAndSignSession,
             icon: _isClosing
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: colors.onPrimary,
                     ),
                   )
                 : const Icon(Icons.verified_outlined),
@@ -1748,12 +1791,10 @@ class _LiveAttendanceSessionScreenState
                   : 'Cerrar Sesión y Firmar Acta',
             ),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF0033A0),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              backgroundColor: colors.primary,
+              foregroundColor: colors.onPrimary,
+              padding: spacing.insetsVMd,
+              shape: radii.buttonShape(),
             ),
           ),
         ),
