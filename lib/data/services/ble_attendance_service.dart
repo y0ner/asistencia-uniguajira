@@ -339,6 +339,13 @@ class BleAttendanceService {
     return _emitIfNearby(packet16, rssi);
   }
 
+  /// Inyecta una incidencia simulada para pruebas deterministas.
+  void injectSimulatedIssue(BleRuntimeIssue issue) {
+    if (!_disposed) {
+      _reportIssue(issue);
+    }
+  }
+
   /// Detiene emisión y escaneo, y cierra los Streams de eventos e incidencias.
   Future<void> dispose() async {
     if (_disposed) {

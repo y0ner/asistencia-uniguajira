@@ -412,6 +412,7 @@ class AttendanceSessionController {
   SignedSessionActa? _signedActa;
   StudentDetectionOutcome? _lastDetectionOutcome;
   StreamSubscription<BlePacketEvent>? _bleSubscription;
+  StreamSubscription<BleRuntimeIssue>? _bleIssuesSubscription;
   Timer? _echoTimer;
   Future<void> _operationQueue = Future<void>.value();
   Future<void> _echoQueue = Future<void>.value();
@@ -434,6 +435,9 @@ class AttendanceSessionController {
 
   /// Último aviso BLE no fatal.
   String? get bleWarning => _state?.bleWarning ?? _lastBleWarning;
+
+  /// Stream de incidencias y anomalías de hardware o runtime BLE.
+  Stream<BleRuntimeIssue> get bleIssues => _bleService.issues;
 
   /// Último error de una detección automática del Stream BLE.
   String? get lastAsyncError => _lastAsyncError;
@@ -894,6 +898,12 @@ class AttendanceSessionController {
       },
       onError: (Object error, StackTrace stackTrace) {
         _lastAsyncError = '$error\n$stackTrace';
+        _warn('Error en canal de paquetes BLE: $error');
+      },
+    );
+    _bleIssuesSubscription = _bleService.issues.listen(
+      (BleRuntimeIssue issue) {
+        _warn(issue.message);
       },
     );
   }
@@ -970,6 +980,10 @@ class AttendanceSessionController {
     final subscription = _bleSubscription;
     _bleSubscription = null;
     await subscription?.cancel();
+
+    final issuesSubscription = _bleIssuesSubscription;
+    _bleIssuesSubscription = null;
+    await issuesSubscription?.cancel();
 
     try {
       await _bleService.stopScan();

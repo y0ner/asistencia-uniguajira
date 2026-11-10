@@ -1149,5 +1149,26 @@ void main() {
         await expectLater(controller.dispose(), completes);
       },
     );
+
+    test(
+      '6.2 controller captura incidencias de BleAttendanceService y actualiza bleWarning',
+      () async {
+        await controller.startTeacherSession(course: course, customPin: 55);
+
+        // Simulamos emisión de una incidencia BLE
+        ble.injectSimulatedIssue(
+          const BleRuntimeIssue(
+            type: BleRuntimeIssueType.advertising,
+            message: 'ADVERTISE_FAILED_INTERNAL_ERROR en adaptador',
+          ),
+        );
+
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          controller.bleWarning,
+          contains('ADVERTISE_FAILED_INTERNAL_ERROR en adaptador'),
+        );
+      },
+    );
   });
 }
