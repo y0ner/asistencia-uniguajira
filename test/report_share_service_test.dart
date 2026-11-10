@@ -245,7 +245,7 @@ void main() {
         // Verificar título e información clave
         expect(find.text('Excel Oficial Generado'), findsOneWidget);
         expect(find.textContaining('24576 bytes'), findsOneWidget);
-        expect(find.textContaining('Asistencia_MAT101_01.xlsx'), findsOneWidget);
+        expect(find.text('Asistencia_MAT101_01.xlsx'), findsOneWidget); // nombre (la ruta completa también lo contiene)
         expect(find.text(testHmac), findsOneWidget);
 
         // Verificar acciones: Cerrar y Compartir
