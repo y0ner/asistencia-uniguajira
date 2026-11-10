@@ -28,6 +28,20 @@ android {
         versionName = flutter.versionName
     }
 
+    flavorDimensions += "rol"
+    productFlavors {
+        create("docente") {
+            dimension = "rol"
+            applicationIdSuffix = ".docente"
+            resValue("string", "app_name", "Asistencia Docente")
+        }
+        create("estudiante") {
+            dimension = "rol"
+            applicationIdSuffix = ".estudiante"
+            resValue("string", "app_name", "Asistencia Estudiante")
+        }
+    }
+
     buildTypes {
         release {
             // Signing with the debug keys for now, so `flutter run --release` works.
