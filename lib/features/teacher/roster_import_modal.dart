@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/models/course_model.dart';
 import '../../data/services/roster_import_service.dart';
+import '../../theme/theme.dart';
 
 /// Modal institucional con 3 pestañas para la ingesta de estudiantes a un curso:
 /// 1) Pegar lista desde el portapapeles.
@@ -23,13 +24,12 @@ class RosterImportModal extends StatefulWidget {
 
   /// Abre el modal inferior responsivo y devuelve `true` si se importó algún registro.
   static Future<bool?> show(BuildContext context, CourseModel course) {
+    final radii = AppRadii.of(context);
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      shape: radii.modalShape(),
       builder: (BuildContext ctx) => RosterImportModal(course: course),
     );
   }
@@ -229,20 +229,22 @@ class _RosterImportModalState extends State<RosterImportModal> {
       _manualEmailController.clear();
 
       if (!mounted) return;
+      final colors = AppColors.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'Estudiante ${student.fullName} registrado en Bit #${student.bitIndex.toString().padLeft(2, '0')}.',
           ),
-          backgroundColor: const Color(0xFF00843D),
+          backgroundColor: colors.statusNormal,
         ),
       );
     } catch (e) {
       if (!mounted) return;
+      final colors = AppColors.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al registrar estudiante: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: colors.statusPerdida,
         ),
       );
     } finally {
@@ -254,14 +256,19 @@ class _RosterImportModalState extends State<RosterImportModal> {
     required String title,
     required RosterImportResult result,
   }) {
+    final colors = AppColors.of(context);
+    final radii = AppRadii.of(context);
+    final spacing = AppSpacing.of(context);
+
     showDialog<void>(
       context: context,
       builder: (BuildContext ctx) {
         return AlertDialog(
+          shape: radii.dialogShape(),
           title: Row(
             children: <Widget>[
-              const Icon(Icons.check_circle_outline, color: Color(0xFF00843D)),
-              const SizedBox(width: 8),
+              Icon(Icons.check_circle_outline, color: colors.statusNormal),
+              SizedBox(width: spacing.xs),
               Expanded(
                 child: Text(
                   title,
@@ -278,24 +285,24 @@ class _RosterImportModalState extends State<RosterImportModal> {
                 'Resumen de procesamiento:',
                 style: Theme.of(ctx).textTheme.titleSmall,
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: spacing.sm),
               _ResultRow(
                 icon: Icons.check,
-                color: const Color(0xFF00843D),
+                color: colors.statusNormal,
                 label: 'Estudiantes insertados:',
                 value: '${result.insertedCount}',
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: spacing.xs),
               _ResultRow(
                 icon: Icons.copy,
-                color: Colors.orange.shade800,
+                color: colors.statusAlerta,
                 label: 'Duplicados omitidos:',
                 value: '${result.duplicatesSkipped}',
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: spacing.xs),
               _ResultRow(
                 icon: Icons.cancel_outlined,
-                color: Theme.of(ctx).colorScheme.error,
+                color: colors.statusPerdida,
                 label: 'Filas inválidas / sin cupo:',
                 value: '${result.invalidRowsSkipped}',
               ),
@@ -303,6 +310,7 @@ class _RosterImportModalState extends State<RosterImportModal> {
           ),
           actions: <Widget>[
             FilledButton(
+              style: FilledButton.styleFrom(shape: radii.buttonShape()),
               onPressed: () {
                 Navigator.of(ctx).pop();
                 Navigator.of(context).pop(_hasChanges);
@@ -318,34 +326,37 @@ class _RosterImportModalState extends State<RosterImportModal> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
     final viewInsets = MediaQuery.of(context).viewInsets;
 
     return DefaultTabController(
       length: 3,
       child: Padding(
-        padding: EdgeInsets.only(bottom: viewInsets.bottom),
+        padding: spacing.only(bottom: viewInsets.bottom),
         child: SizedBox(
           height: MediaQuery.of(context).size.height * 0.85,
           child: Column(
             children: <Widget>[
               // Barra de arrastre y título
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: spacing.fromLTRB(spacing.md, spacing.sm, spacing.md, spacing.xs),
                 child: Row(
                   children: <Widget>[
                     Container(
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(2),
+                        color: colors.onSurfaceMuted.withValues(alpha: 0.4),
+                        borderRadius: radii.borderXs,
                       ),
                     ),
                   ],
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: spacing.symmetric(horizontal: spacing.lg),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: <Widget>[
@@ -357,13 +368,13 @@ class _RosterImportModalState extends State<RosterImportModal> {
                             'Cargar Estudiantes',
                             style: theme.textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.primary,
+                              color: colors.primary,
                             ),
                           ),
                           Text(
                             '${widget.course.name} (${widget.course.code} - G${widget.course.groupCode})',
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                              color: colors.onSurfaceMuted,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -378,13 +389,13 @@ class _RosterImportModalState extends State<RosterImportModal> {
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: spacing.xs),
 
               // Pestañas
               TabBar(
-                labelColor: theme.colorScheme.primary,
-                unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-                indicatorColor: theme.colorScheme.primary,
+                labelColor: colors.primary,
+                unselectedLabelColor: colors.onSurfaceMuted,
+                indicatorColor: colors.primary,
                 tabs: const <Widget>[
                   Tab(
                     icon: Icon(Icons.content_paste_outlined),
@@ -404,13 +415,13 @@ class _RosterImportModalState extends State<RosterImportModal> {
               // Contenido de las pestañas
               Expanded(
                 child: _isLoading
-                    ? const Center(
+                    ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: <Widget>[
-                            CircularProgressIndicator(),
-                            SizedBox(height: 16),
-                            Text('Procesando datos del curso...'),
+                            const CircularProgressIndicator(),
+                            SizedBox(height: spacing.md),
+                            const Text('Procesando datos del curso...'),
                           ],
                         ),
                       )
@@ -430,250 +441,277 @@ class _RosterImportModalState extends State<RosterImportModal> {
   }
 
   Widget _buildClipboardTab(ThemeData theme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Icon(
-                  Icons.info_outline,
-                  size: 20,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Pega filas copiadas de Excel o SMA. Se admiten columnas separadas '
-                    'por tabulador, punto y coma, coma o guion. La fila de títulos se '
-                    'detecta automáticamente.',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+    return Builder(
+      builder: (BuildContext context) {
+        final colors = AppColors.of(context);
+        final spacing = AppSpacing.of(context);
+        final radii = AppRadii.of(context);
+
+        return SingleChildScrollView(
+          padding: spacing.insetsCard,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              OutlinedButton.icon(
-                onPressed: _pasteFromSystemClipboard,
-                icon: const Icon(Icons.paste, size: 18),
-                label: const Text('Pegar Portapapeles'),
+              Container(
+                padding: spacing.insetsSm,
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHigh.withValues(alpha: 0.5),
+                  borderRadius: radii.borderMd,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: colors.primary,
+                    ),
+                    SizedBox(width: spacing.xs),
+                    Expanded(
+                      child: Text(
+                        'Pega filas copiadas de Excel o SMA. Se admiten columnas separadas '
+                        'por tabulador, punto y coma, coma o guion. La fila de títulos se '
+                        'detecta automáticamente.',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: spacing.sm),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: <Widget>[
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(shape: radii.buttonShape()),
+                    onPressed: _pasteFromSystemClipboard,
+                    icon: const Icon(Icons.paste, size: 18),
+                    label: const Text('Pegar Portapapeles'),
+                  ),
+                ],
+              ),
+              SizedBox(height: spacing.xs),
+              TextField(
+                controller: _clipboardController,
+                maxLines: 8,
+                minLines: 5,
+                decoration: InputDecoration(
+                  hintText: 'Ejemplo:\n0123456789\tPEREZ JUAN\tjperez@uniguajira.edu.co\n'
+                      '0987654321\tGOMEZ MARIA\tmgomez@uniguajira.edu.co',
+                  border: OutlineInputBorder(
+                    borderRadius: radii.borderMd,
+                  ),
+                  filled: true,
+                ),
+              ),
+              SizedBox(height: spacing.md),
+              FilledButton.icon(
+                onPressed: _processClipboard,
+                icon: const Icon(Icons.bolt),
+                label: const Text('Procesar e Importar Roster'),
+                style: FilledButton.styleFrom(
+                  padding: spacing.insetsVMd,
+                  shape: radii.buttonShape(),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _clipboardController,
-            maxLines: 8,
-            minLines: 5,
-            decoration: InputDecoration(
-              hintText: 'Ejemplo:\n0123456789\tPEREZ JUAN\tjperez@uniguajira.edu.co\n'
-                  '0987654321\tGOMEZ MARIA\tmgomez@uniguajira.edu.co',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _processClipboard,
-            icon: const Icon(Icons.bolt),
-            label: const Text('Procesar e Importar Roster'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildFileTab(ThemeData theme) {
-    final file = _selectedFile;
-    final size = _selectedFileSize;
+    return Builder(
+      builder: (BuildContext context) {
+        final colors = AppColors.of(context);
+        final spacing = AppSpacing.of(context);
+        final radii = AppRadii.of(context);
+        final file = _selectedFile;
+        final size = _selectedFileSize;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Icon(
-                  Icons.info_outline,
-                  size: 20,
-                  color: theme.colorScheme.primary,
+        return SingleChildScrollView(
+          padding: spacing.insetsCard,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Container(
+                padding: spacing.insetsSm,
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHigh.withValues(alpha: 0.5),
+                  borderRadius: radii.borderMd,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Carga una lista en formato CSV (.csv) o un libro de Excel (.xlsx). '
-                    'Los códigos de estudiante conservan los ceros iniciales intactos.',
-                    style: theme.textTheme.bodySmall,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: colors.primary,
+                    ),
+                    SizedBox(width: spacing.xs),
+                    Expanded(
+                      child: Text(
+                        'Carga una lista en formato CSV (.csv) o un libro de Excel (.xlsx). '
+                        'Los códigos de estudiante conservan los ceros iniciales intactos.',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: spacing.lg),
+
+              // Selector visual de archivo
+              InkWell(
+                onTap: _pickFile,
+                borderRadius: radii.borderLg,
+                child: Container(
+                  padding: spacing.symmetric(vertical: spacing.lg, horizontal: spacing.md),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: file != null
+                          ? colors.primary
+                          : colors.outlineVariant,
+                      width: 2,
+                    ),
+                    borderRadius: radii.borderLg,
+                    color: file != null
+                        ? colors.primaryContainer.withValues(alpha: 0.2)
+                        : colors.surface,
+                  ),
+                  child: Column(
+                    children: <Widget>[
+                      Icon(
+                        file != null
+                            ? Icons.insert_drive_file
+                            : Icons.cloud_upload_outlined,
+                        size: 48,
+                        color: file != null
+                            ? colors.primary
+                            : colors.onSurfaceMuted,
+                      ),
+                      SizedBox(height: spacing.sm),
+                      Text(
+                        file != null ? file.name : 'Toca para seleccionar archivo',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: spacing.xxs),
+                      Text(
+                        file != null && size != null
+                            ? '${(size / 1024).toStringAsFixed(1)} KB'
+                            : 'Formatos admitidos: .csv, .xlsx',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: spacing.lg),
+
+              FilledButton.icon(
+                onPressed: file != null ? _processFile : null,
+                icon: const Icon(Icons.file_download_done),
+                label: const Text('Importar Archivo'),
+                style: FilledButton.styleFrom(
+                  padding: spacing.insetsVMd,
+                  shape: radii.buttonShape(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildManualTab(ThemeData theme) {
+    return Builder(
+      builder: (BuildContext context) {
+        final colors = AppColors.of(context);
+        final spacing = AppSpacing.of(context);
+        final radii = AppRadii.of(context);
+
+        return SingleChildScrollView(
+          padding: spacing.insetsCard,
+          child: Form(
+            key: _manualFormKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  'Registra individualmente a un estudiante. El sistema le asignará '
+                  'automáticamente el siguiente bit libre (0..63) y su secreto HMAC.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceMuted,
+                  ),
+                ),
+                SizedBox(height: spacing.md),
+                TextFormField(
+                  controller: _manualCodeController,
+                  keyboardType: TextInputType.text,
+                  decoration: InputDecoration(
+                    labelText: 'Código Estudiantil *',
+                    hintText: '0123456789 (preserva ceros)',
+                    prefixIcon: const Icon(Icons.badge_outlined),
+                    border: OutlineInputBorder(borderRadius: radii.borderMd),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El código es obligatorio';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: spacing.md),
+                TextFormField(
+                  controller: _manualNameController,
+                  keyboardType: TextInputType.name,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: 'Nombre Completo *',
+                    hintText: 'Ej. ALVARO JOSE LOPEZ GUERRA',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: OutlineInputBorder(borderRadius: radii.borderMd),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El nombre es obligatorio';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: spacing.md),
+                TextFormField(
+                  controller: _manualEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: 'Correo Institucional (Opcional)',
+                    hintText: 'usuario@uniguajira.edu.co',
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    border: OutlineInputBorder(borderRadius: radii.borderMd),
+                  ),
+                ),
+                SizedBox(height: spacing.lg),
+                FilledButton.icon(
+                  onPressed: _submitManual,
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Registrar Estudiante'),
+                  style: FilledButton.styleFrom(
+                    padding: spacing.insetsVMd,
+                    shape: radii.buttonShape(),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
-
-          // Selector visual de archivo
-          InkWell(
-            onTap: _pickFile,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: file != null
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.outlineVariant,
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                color: file != null
-                    ? theme.colorScheme.primaryContainer.withValues(alpha: 0.2)
-                    : theme.colorScheme.surface,
-              ),
-              child: Column(
-                children: <Widget>[
-                  Icon(
-                    file != null
-                        ? Icons.insert_drive_file
-                        : Icons.cloud_upload_outlined,
-                    size: 48,
-                    color: file != null
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    file != null ? file.name : 'Toca para seleccionar archivo',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    file != null && size != null
-                        ? '${(size / 1024).toStringAsFixed(1)} KB'
-                        : 'Formatos admitidos: .csv, .xlsx',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          FilledButton.icon(
-            onPressed: file != null ? _processFile : null,
-            icon: const Icon(Icons.file_download_done),
-            label: const Text('Importar Archivo'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildManualTab(ThemeData theme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Form(
-        key: _manualFormKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              'Registra individualmente a un estudiante. El sistema le asignará '
-              'automáticamente el siguiente bit libre (0..63) y su secreto HMAC.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _manualCodeController,
-              keyboardType: TextInputType.text,
-              decoration: const InputDecoration(
-                labelText: 'Código Estudiantil *',
-                hintText: '0123456789 (preserva ceros)',
-                prefixIcon: Icon(Icons.badge_outlined),
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'El código es obligatorio';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _manualNameController,
-              keyboardType: TextInputType.name,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Nombre Completo *',
-                hintText: 'Ej. ALVARO JOSE LOPEZ GUERRA',
-                prefixIcon: Icon(Icons.person_outline),
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'El nombre es obligatorio';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _manualEmailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Correo Institucional (Opcional)',
-                hintText: 'usuario@uniguajira.edu.co',
-                prefixIcon: Icon(Icons.email_outlined),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _submitManual,
-              icon: const Icon(Icons.person_add),
-              label: const Text('Registrar Estudiante'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -693,10 +731,12 @@ class _ResultRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final spacing = AppSpacing.of(context);
+
     return Row(
       children: <Widget>[
         Icon(icon, size: 18, color: color),
-        const SizedBox(width: 8),
+        SizedBox(width: spacing.xs),
         Expanded(
           child: Text(
             label,

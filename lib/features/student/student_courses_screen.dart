@@ -9,6 +9,7 @@ import '../../core/crypto/ble_packet_codec.dart';
 import '../../core/models/student_enrollment_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/student_enrollment_service.dart';
+import '../../theme/theme.dart';
 import 'student_live_beacon_screen.dart';
 import 'student_qr_enrollment_screen.dart';
 
@@ -86,37 +87,45 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
     if (result != null) {
       await _loadEnrollments();
       if (!mounted) return;
+      final colors = AppColors.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             '¡Enrolado exitosamente en ${result.courseName}! '
             'Bit #${result.bitIndex.toString().padLeft(2, '0')}',
           ),
-          backgroundColor: Theme.of(context).colorScheme.primary,
+          backgroundColor: colors.statusNormal,
         ),
       );
     }
   }
 
+  Future<void> _openLiveBeaconScreen(StudentEnrollmentModel enrollment) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => StudentLiveBeaconScreen(
+          enrollment: enrollment,
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirmRemoveEnrollment(
     StudentEnrollmentModel enrollment,
   ) async {
+    final colors = AppColors.of(context);
+    final radii = AppRadii.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) {
-        final theme = Theme.of(ctx);
         return AlertDialog(
-          icon: Icon(
-            Icons.warning_amber_rounded,
-            color: theme.colorScheme.error,
-            size: 40,
-          ),
-          title: const Text('¿Desvincular credencial?'),
+          shape: radii.dialogShape(),
+          title: const Text('¿Desvincular curso?'),
           content: Text(
-            'Esta acción eliminará tu credencial local y semilla criptográfica '
-            'del curso "${enrollment.courseName}".\n\n'
-            'Perderás tu posición asignada (Bit #${enrollment.bitIndex.toString().padLeft(2, '0')}) '
-            'y deberás escanear nuevamente el código QR con el docente.',
+            'Se eliminará tu credencial criptográfica del curso '
+            '"${enrollment.courseName}". Para volver a marcar asistencia, '
+            'deberás escanear el QR del docente nuevamente.',
           ),
           actions: <Widget>[
             TextButton(
@@ -125,8 +134,8 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: theme.colorScheme.error,
-                foregroundColor: theme.colorScheme.onError,
+                backgroundColor: colors.statusPerdida,
+                foregroundColor: colors.onStatusPerdida,
               ),
               onPressed: () => Navigator.of(ctx).pop(true),
               child: const Text('Desvincular'),
@@ -136,72 +145,65 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
       },
     );
 
-    if (!mounted) return;
-
     if (confirmed == true) {
       try {
         await _enrollmentService.removeEnrollment(enrollment.id);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Credencial de "${enrollment.courseName}" eliminada correctamente.',
-            ),
-          ),
-        );
         await _loadEnrollments();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Credencial de "${enrollment.courseName}" desvinculada.',
+              ),
+            ),
+          );
+        }
       } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al desvincular credencial: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al desvincular curso: $e'),
+              backgroundColor: colors.statusPerdida,
+            ),
+          );
+        }
       }
     }
   }
 
-  void _openLiveBeaconScreen(StudentEnrollmentModel enrollment) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => StudentLiveBeaconScreen(
-          enrollment: enrollment,
-          database: widget.database,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mis Cursos Enrolados'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
         actions: <Widget>[
           IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: 'Escanear QR de enrolamiento',
+            onPressed: _openQrScanner,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Actualizar',
+            tooltip: 'Actualizar lista',
             onPressed: _loadEnrollments,
           ),
         ],
       ),
-      body: _buildBody(theme),
+      body: _buildBody(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openQrScanner,
         icon: const Icon(Icons.qr_code_scanner),
-        label: const Text('Enrolar Curso (Escanear QR)'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
+        label: const Text('Escanear QR'),
       ),
     );
   }
 
-  Widget _buildBody(ThemeData theme) {
+  Widget _buildBody() {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -209,22 +211,24 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
     if (_errorMessage != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: spacing.insetsLg,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Icon(
                 Icons.error_outline,
                 size: 56,
-                color: theme.colorScheme.error,
+                color: colors.statusPerdida,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing.md),
               Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodyLarge,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: colors.onSurface,
+                ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing.md),
               FilledButton.icon(
                 onPressed: _loadEnrollments,
                 icon: const Icon(Icons.refresh),
@@ -239,55 +243,55 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
     if (_enrollments.isEmpty) {
       return Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
+          padding: spacing.insetsXl,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: spacing.insetsLg,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withValues(
-                      alpha: 0.3,
-                    ),
+                    color: colors.primaryContainer.withValues(alpha: 0.5),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.school_outlined,
                     size: 72,
-                    color: theme.colorScheme.primary,
+                    color: colors.primary,
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: spacing.lg),
                 Text(
                   'Aún no estás enrolado en ningún curso',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: colors.onSurface,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: spacing.sm),
                 Text(
                   'Escanea el código QR en el teléfono de tu docente el primer '
                   'día de clase para recibir tu posición en el Mapa de Bits y tu '
                   'semilla criptográfica.',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: colors.onSurfaceMuted,
                     height: 1.4,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 28),
+                SizedBox(height: spacing.xl),
                 FilledButton.icon(
                   onPressed: _openQrScanner,
                   icon: const Icon(Icons.qr_code_scanner),
                   label: const Text('Enrolar Primer Curso'),
                   style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 14,
+                    padding: spacing.symmetric(
+                      horizontal: spacing.lg,
+                      vertical: spacing.sm,
                     ),
+                    shape: radii.buttonShape(),
                   ),
                 ),
               ],
@@ -300,11 +304,11 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
     return RefreshIndicator(
       onRefresh: _loadEnrollments,
       child: ListView.builder(
-        padding: const EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 16,
-          bottom: 88,
+        padding: spacing.only(
+          left: spacing.md,
+          right: spacing.md,
+          top: spacing.md,
+          bottom: spacing.xxl + spacing.xl,
         ),
         itemCount: _enrollments.length,
         itemBuilder: (BuildContext context, int index) {
@@ -335,22 +339,21 @@ class _EnrollmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final enrolledDate = DateTime.fromMillisecondsSinceEpoch(
       enrollment.enrolledAtEpochMs,
     );
     final formattedDate = DateFormat('dd/MM/yyyy · HH:mm').format(enrolledDate);
 
     return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
+      elevation: 0,
+      margin: spacing.only(bottom: spacing.md),
+      shape: radii.cardShape(side: BorderSide(color: colors.outlineVariant)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: spacing.insetsCard,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -359,18 +362,18 @@ class _EnrollmentCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: spacing.all(spacing.xs + 2),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
+                    color: colors.primaryContainer,
+                    borderRadius: radii.borderMd,
                   ),
                   child: Icon(
                     Icons.menu_book_rounded,
-                    color: theme.colorScheme.primary,
+                    color: colors.primary,
                     size: 24,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: spacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -379,23 +382,24 @@ class _EnrollmentCard extends StatelessWidget {
                         enrollment.courseName,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: colors.onSurface,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: spacing.xxs / 2),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
+                        padding: spacing.symmetric(
+                          horizontal: spacing.xs,
+                          vertical: spacing.xxs / 2,
                         ),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(6),
+                          color: colors.surfaceContainerHigh,
+                          borderRadius: radii.borderXs,
                         ),
                         child: Text(
                           'Código: ${enrollment.courseCode}',
                           style: theme.textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.onSurfaceVariant,
+                            color: colors.onSurfaceMuted,
                           ),
                         ),
                       ),
@@ -405,14 +409,14 @@ class _EnrollmentCard extends StatelessWidget {
                 IconButton(
                   icon: Icon(
                     Icons.delete_outline,
-                    color: theme.colorScheme.error,
+                    color: colors.statusPerdida,
                   ),
                   tooltip: 'Desvincular credencial',
                   onPressed: onRemove,
                 ),
               ],
             ),
-            const Divider(height: 20),
+            Divider(height: spacing.lg),
 
             // Datos del estudiante
             Row(
@@ -420,50 +424,50 @@ class _EnrollmentCard extends StatelessWidget {
                 Icon(
                   Icons.person_outline,
                   size: 20,
-                  color: theme.colorScheme.primary,
+                  color: colors.primary,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: spacing.xs),
                 Expanded(
                   child: Text(
                     enrollment.fullName,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
+                      color: colors.onSurface,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: spacing.xxs + 2),
             Row(
               children: <Widget>[
                 Icon(
                   Icons.badge_outlined,
                   size: 20,
-                  color: theme.colorScheme.primary,
+                  color: colors.primary,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: spacing.xs),
                 Text(
                   'Código: ${enrollment.studentCode}',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.w500,
+                    color: colors.onSurface,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: spacing.sm),
 
             // Badge destacado con el Bit asignado en el Bitmap (0..63)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: spacing.symmetric(horizontal: spacing.sm + 2, vertical: spacing.xs + 2),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withValues(
-                  alpha: 0.6,
-                ),
-                borderRadius: BorderRadius.circular(10),
+                color: colors.primaryContainer.withValues(alpha: 0.6),
+                borderRadius: radii.borderSm,
                 border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                  color: colors.primary.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -471,36 +475,36 @@ class _EnrollmentCard extends StatelessWidget {
                   Icon(
                     Icons.tag_rounded,
                     size: 22,
-                    color: theme.colorScheme.primary,
+                    color: colors.primary,
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: spacing.xs),
                   Expanded(
                     child: Text(
                       'Bit Asignado: #${enrollment.bitIndex.toString().padLeft(2, '0')} (0..63)',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onPrimaryContainer,
+                        color: colors.onPrimaryContainer,
                       ),
                     ),
                   ),
                   Icon(
                     Icons.verified_outlined,
                     size: 20,
-                    color: theme.colorScheme.primary,
+                    color: colors.primary,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
 
             // Fecha de enrolamiento
             Text(
               'Enrolado el $formattedDate',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.outline,
+                color: colors.onSurfaceMuted,
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: spacing.md),
 
             // Botón de acción principal
             SizedBox(
@@ -510,10 +514,10 @@ class _EnrollmentCard extends StatelessWidget {
                 icon: const Icon(Icons.bluetooth_searching),
                 label: const Text('Marcar Asistencia BLE'),
                 style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  backgroundColor: colors.primary,
+                  foregroundColor: colors.onPrimary,
+                  padding: spacing.symmetric(vertical: spacing.sm),
+                  shape: radii.buttonShape(),
                 ),
               ),
             ),
@@ -568,6 +572,10 @@ class _StudentBleAttendancePreviewDialogState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final currentTick = BlePacketCodec.computeTimeTick(_now);
     final epochSeconds = _now.millisecondsSinceEpoch ~/ 1000;
     final elapsedInWindow = epochSeconds % AppConstants.hmacWindowSeconds;
@@ -588,10 +596,11 @@ class _StudentBleAttendancePreviewDialogState
         int.tryParse(pinText) != null;
 
     return AlertDialog(
+      shape: radii.dialogShape(),
       title: Row(
         children: <Widget>[
-          Icon(Icons.bluetooth_searching, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
+          Icon(Icons.bluetooth_searching, color: colors.primary),
+          SizedBox(width: spacing.xs),
           const Expanded(
             child: Text(
               'Asistencia BLE · Vista Previa',
@@ -609,10 +618,10 @@ class _StudentBleAttendancePreviewDialogState
             children: <Widget>[
               // Asignatura y estudiante
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: spacing.insetsSm,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
+                  color: colors.surfaceContainerHigh,
+                  borderRadius: radii.borderSm,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -621,34 +630,38 @@ class _StudentBleAttendancePreviewDialogState
                       widget.enrollment.courseName,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: colors.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: spacing.xxs / 2),
                     Text(
                       '${widget.enrollment.fullName} · Código: ${widget.enrollment.studentCode}',
-                      style: theme.textTheme.bodySmall,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceMuted,
+                      ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: spacing.xxs),
                     Text(
                       'Bit Asignado: #${widget.enrollment.bitIndex.toString().padLeft(2, '0')}',
                       style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.primary,
+                        color: colors.primary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing.md),
 
               // Campo de PIN verbal de 2 dígitos
               Text(
                 'PIN Verbal del Aula (2 dígitos)',
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: colors.onSurface,
                 ),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: spacing.xxs + 2),
               TextField(
                 controller: _pinController,
                 keyboardType: TextInputType.number,
@@ -660,31 +673,29 @@ class _StudentBleAttendancePreviewDialogState
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   letterSpacing: 10,
+                  color: colors.onSurface,
                 ),
                 decoration: InputDecoration(
                   hintText: '00',
                   counterText: '',
                   prefixIcon: const Icon(Icons.pin_outlined),
                   suffixIcon: isPinValid
-                      ? const Icon(Icons.check_circle, color: Colors.green)
-                      : const Icon(Icons.info_outline, color: Colors.grey),
-                  border: const OutlineInputBorder(),
+                      ? Icon(Icons.check_circle, color: colors.statusNormal)
+                      : Icon(Icons.info_outline, color: colors.onSurfaceMuted),
                   helperText: 'Dictado en voz alta por el docente en el aula.',
                   helperMaxLines: 2,
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing.md),
 
               // Tarjeta de previsualización del Token HMAC rotativo
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: spacing.insetsCard,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(
-                    alpha: 0.4,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
+                  color: colors.primaryContainer.withValues(alpha: 0.4),
+                  borderRadius: radii.borderMd,
                   border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                    color: colors.primary.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Column(
@@ -697,29 +708,29 @@ class _StudentBleAttendancePreviewDialogState
                           style: theme.textTheme.labelSmall?.copyWith(
                             letterSpacing: 1.2,
                             fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
+                            color: colors.primary,
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
+                          padding: spacing.symmetric(
+                            horizontal: spacing.xxs + 2,
+                            vertical: spacing.xxs / 2,
                           ),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            borderRadius: BorderRadius.circular(4),
+                            color: colors.primary,
+                            borderRadius: radii.borderXs,
                           ),
                           child: Text(
                             'Ventana 30s',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onPrimary,
+                              color: colors.onPrimary,
                               fontSize: 10,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: spacing.xs),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: <Widget>[
@@ -729,10 +740,10 @@ class _StudentBleAttendancePreviewDialogState
                             fontFamily: 'monospace',
                             fontWeight: FontWeight.bold,
                             letterSpacing: 2,
-                            color: theme.colorScheme.primary,
+                            color: colors.primary,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: spacing.xs),
                         IconButton(
                           icon: const Icon(Icons.copy, size: 20),
                           tooltip: 'Copiar token',
@@ -748,16 +759,14 @@ class _StudentBleAttendancePreviewDialogState
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: spacing.xs),
                     LinearProgressIndicator(
                       value: progress,
-                      backgroundColor: theme.colorScheme.primary.withValues(
-                        alpha: 0.15,
-                      ),
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(4),
+                      backgroundColor: colors.primary.withValues(alpha: 0.15),
+                      color: colors.primary,
+                      borderRadius: radii.borderXs,
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: spacing.xxs + 2),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: <Widget>[
@@ -765,12 +774,13 @@ class _StudentBleAttendancePreviewDialogState
                           'Rotación en ${secondsRemaining}s',
                           style: theme.textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: colors.onSurface,
                           ),
                         ),
                         Text(
                           'Tick #$currentTick',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.outline,
+                            color: colors.onSurfaceMuted,
                           ),
                         ),
                       ],
@@ -778,16 +788,14 @@ class _StudentBleAttendancePreviewDialogState
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: spacing.sm + 2),
 
               // Nota informativa
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: spacing.insetsSm,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.secondaryContainer.withValues(
-                    alpha: 0.4,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
+                  color: colors.secondaryContainer.withValues(alpha: 0.4),
+                  borderRadius: radii.borderSm,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -795,17 +803,17 @@ class _StudentBleAttendancePreviewDialogState
                     Icon(
                       Icons.info_outline,
                       size: 18,
-                      color: theme.colorScheme.secondary,
+                      color: colors.secondary,
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: spacing.xs),
                     Expanded(
                       child: Text(
                         'Modo previsualización: La emisión BLE publicitaria y '
-                        'sincronización con el radar del aula se conectará en la Etapa 3. '
+                        'sincronización con el radar del aula se conecta en tiempo real. '
                         'Tu credencial criptográfica local está activa y verificada.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 11,
-                          color: theme.colorScheme.onSecondaryContainer,
+                          color: colors.onSecondaryContainer,
                         ),
                       ),
                     ),

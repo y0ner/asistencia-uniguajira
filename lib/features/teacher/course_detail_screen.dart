@@ -7,6 +7,7 @@ import '../../core/models/session_model.dart';
 import '../../core/models/student_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/roster_import_service.dart';
+import '../../theme/theme.dart';
 import 'course_reports_screen.dart';
 import 'live_attendance_session_screen.dart';
 import 'roster_import_modal.dart';
@@ -66,10 +67,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+        final colors = AppColors.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al cargar datos del curso: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            backgroundColor: colors.statusPerdida,
           ),
         );
       }
@@ -84,6 +86,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   void _showStudentQrDialog(StudentModel student) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final payload = _rosterService.generateEnrollmentQrPayload(
       course: widget.course,
       student: student,
@@ -96,10 +102,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         final bitPadded = student.bitIndex.toString().padLeft(2, '0');
 
         return AlertDialog(
+          shape: radii.dialogShape(),
           title: Row(
             children: <Widget>[
-              Icon(Icons.qr_code_2, color: theme.colorScheme.primary, size: 28),
-              const SizedBox(width: 8),
+              Icon(Icons.qr_code_2, color: colors.primary, size: 28),
+              SizedBox(width: spacing.xs),
               const Expanded(
                 child: Text(
                   'Credencial de Enrolamiento',
@@ -113,72 +120,80 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+                  padding: spacing.symmetric(
+                    horizontal: spacing.sm,
+                    vertical: spacing.xxs + 2,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
+                    color: colors.primaryContainer,
+                    borderRadius: radii.borderPill,
                   ),
                   child: Text(
                     'Bit #$bitPadded en el Bitmap',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onPrimaryContainer,
+                      color: colors.onPrimaryContainer,
                       fontSize: 13,
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: spacing.sm),
                 Text(
                   student.fullName,
                   textAlign: TextAlign.center,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: colors.onSurface,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: spacing.xxs),
                 Text(
                   'Código: ${student.studentCode}',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: colors.onSurfaceMuted,
                     letterSpacing: 1.1,
                   ),
                 ),
                 if (student.email != null) ...<Widget>[
-                  const SizedBox(height: 2),
+                  SizedBox(height: spacing.xxs / 2),
                   Text(
                     student.email!,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: colors.onSurfaceMuted,
                     ),
                   ),
                 ],
-                const SizedBox(height: 16),
+                SizedBox(height: spacing.md),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: spacing.insetsSm,
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    color: colors.surfaceContainer,
+                    borderRadius: radii.borderLg,
                     border: Border.all(
-                      color: theme.colorScheme.outlineVariant,
+                      color: colors.outlineVariant,
                     ),
                   ),
                   child: QrImageView(
                     data: payload,
                     version: QrVersions.auto,
                     size: 200.0,
-                    backgroundColor: Colors.white,
+                    eyeStyle: QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: colors.onSurface,
+                    ),
+                    dataModuleStyle: QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: colors.onSurface,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: spacing.sm),
                 Text(
                   'Pide al estudiante escanear este código desde el "Modo Estudiante" '
                   'para guardar su secreto HMAC único en su teléfono.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: colors.onSurfaceMuted,
                   ),
                 ),
               ],
@@ -243,10 +258,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      final colors = AppColors.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al consultar el acta: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: colors.statusPerdida,
         ),
       );
     }
@@ -254,7 +270,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
     final count = _students.length;
     final maxBits = AppConstants.bitmapBitCount;
     final fraction = count / maxBits;
@@ -264,8 +280,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.course.name),
-          backgroundColor: theme.colorScheme.primary,
-          foregroundColor: theme.colorScheme.onPrimary,
           actions: <Widget>[
             IconButton(
               icon: const Icon(Icons.assessment_outlined),
@@ -279,9 +293,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
             ),
           ],
           bottom: TabBar(
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
+            indicatorColor: colors.primary,
+            labelColor: colors.primary,
+            unselectedLabelColor: colors.onSurfaceMuted,
             tabs: <Widget>[
               Tab(
                 icon: const Icon(Icons.people_outline),
@@ -299,31 +313,39 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
             : TabBarView(
                 children: <Widget>[
                   // Pestaña 1: Roster de Estudiantes e Ingesta
-                  _buildRosterTab(theme, count, maxBits, fraction),
+                  _buildRosterTab(count, maxBits, fraction),
 
                   // Pestaña 2: Historial de Sesiones SQLite
-                  _buildSessionsHistoryTab(theme),
+                  _buildSessionsHistoryTab(),
                 ],
               ),
-        bottomNavigationBar: _buildBottomBleBar(theme),
+        bottomNavigationBar: _buildBottomBleBar(),
       ),
     );
   }
 
   Widget _buildRosterTab(
-    ThemeData theme,
     int count,
     int maxBits,
     double fraction,
   ) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Column(
       children: <Widget>[
         // Tarjeta de cabecera: Datos del curso y capacidad de Bitmap
-        _buildCourseHeaderCard(theme, count, maxBits, fraction),
+        _buildCourseHeaderCard(count, maxBits, fraction),
 
         // Botonera de acciones: Cargar Estudiantes y Reportes/Excel (.xlsx)
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          padding: spacing.only(
+            left: spacing.md,
+            right: spacing.md,
+            bottom: spacing.xs,
+          ),
           child: Row(
             children: <Widget>[
               Expanded(
@@ -337,25 +359,21 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                         : 'Cargar Estudiantes',
                   ),
                   style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    padding: spacing.symmetric(vertical: spacing.sm),
+                    shape: radii.buttonShape(),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: spacing.xs),
               Expanded(
                 flex: 2,
-                child: FilledButton.tonalIcon(
+                child: OutlinedButton.icon(
                   onPressed: _openReportsScreen,
                   icon: const Icon(Icons.assessment_outlined),
                   label: const Text('Reportes'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                  style: OutlinedButton.styleFrom(
+                    padding: spacing.symmetric(vertical: spacing.sm),
+                    shape: radii.buttonShape(),
                   ),
                 ),
               ),
@@ -365,9 +383,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
         // Encabezado de la lista
         Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
+          padding: spacing.symmetric(
+            horizontal: spacing.md,
+            vertical: spacing.xs,
           ),
           child: Row(
             children: <Widget>[
@@ -375,13 +393,14 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 'Roster de Estudiantes ($count)',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: colors.onSurface,
                 ),
               ),
               const Spacer(),
               Text(
                 'Ordenado por Bit Index',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: colors.onSurfaceMuted,
                 ),
               ),
             ],
@@ -391,19 +410,19 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         // Listado de estudiantes
         Expanded(
           child: _students.isEmpty
-              ? _buildEmptyRosterView(theme)
+              ? _buildEmptyRosterView()
               : RefreshIndicator(
                   onRefresh: _loadData,
                   child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
+                    padding: spacing.symmetric(
+                      horizontal: spacing.md,
+                      vertical: spacing.xxs,
                     ),
                     itemCount: _students.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    separatorBuilder: (_, _) => SizedBox(height: spacing.xs),
                     itemBuilder: (BuildContext context, int index) {
                       final student = _students[index];
-                      return _buildStudentTile(theme, student);
+                      return _buildStudentTile(student);
                     },
                   ),
                 ),
@@ -412,57 +431,63 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     );
   }
 
-  Widget _buildSessionsHistoryTab(ThemeData theme) {
+  Widget _buildSessionsHistoryTab() {
+    final spacing = AppSpacing.of(context);
+
     if (_sessions.isEmpty) {
-      return _buildEmptySessionsView(theme);
+      return _buildEmptySessionsView();
     }
 
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: spacing.insetsCard,
         itemCount: _sessions.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        separatorBuilder: (_, _) => SizedBox(height: spacing.sm),
         itemBuilder: (BuildContext context, int index) {
           final session = _sessions[index];
-          return _buildSessionCard(theme, session);
+          return _buildSessionCard(session);
         },
       ),
     );
   }
 
-  Widget _buildSessionCard(ThemeData theme, SessionModel session) {
+  Widget _buildSessionCard(SessionModel session) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final isClosed = session.closedAt != null;
     final dateDisplay = session.startedAt.replaceAll('T', ' ').split('.').first;
 
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+      shape: radii.cardShape(
         side: BorderSide(
           color: isClosed
-              ? Colors.green.shade300
-              : theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+              ? colors.statusNormal.withValues(alpha: 0.5)
+              : colors.outlineVariant,
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: spacing.insetsCard,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Row(
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                  padding: spacing.symmetric(
+                    horizontal: spacing.xs,
+                    vertical: spacing.xxs,
                   ),
                   decoration: BoxDecoration(
                     color: isClosed
-                        ? Colors.green.shade100
-                        : Colors.blue.shade100,
-                    borderRadius: BorderRadius.circular(6),
+                        ? colors.statusNormalContainer
+                        : colors.bleAccentContainer,
+                    borderRadius: radii.borderXs,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -471,18 +496,18 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                         isClosed ? Icons.verified : Icons.timelapse,
                         size: 14,
                         color: isClosed
-                            ? Colors.green.shade900
-                            : Colors.blue.shade900,
+                            ? colors.onStatusNormalContainer
+                            : colors.onBleAccentContainer,
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: spacing.xxs),
                       Text(
                         isClosed ? 'CERRADA Y FIRMADA' : 'SESIÓN ABIERTA',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: isClosed
-                              ? Colors.green.shade900
-                              : Colors.blue.shade900,
+                              ? colors.onStatusNormalContainer
+                              : colors.onBleAccentContainer,
                         ),
                       ),
                     ],
@@ -490,13 +515,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
+                  padding: spacing.symmetric(
+                    horizontal: spacing.xs,
+                    vertical: spacing.xxs / 2,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(6),
+                    color: colors.primaryContainer,
+                    borderRadius: radii.borderXs,
                   ),
                   child: Text(
                     'PIN: ${session.roomPin}',
@@ -504,49 +529,50 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
-                      color: theme.colorScheme.onPrimaryContainer,
+                      color: colors.onPrimaryContainer,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: spacing.xs + 2),
             Row(
               children: <Widget>[
                 Icon(
                   Icons.calendar_today_outlined,
                   size: 14,
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: colors.onSurfaceMuted,
                 ),
-                const SizedBox(width: 6),
+                SizedBox(width: spacing.xxs + 2),
                 Text(
                   'Inicio: $dateDisplay',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
+                    color: colors.onSurface,
                   ),
                 ),
               ],
             ),
             if (session.closedAt != null) ...<Widget>[
-              const SizedBox(height: 4),
+              SizedBox(height: spacing.xxs),
               Row(
                 children: <Widget>[
                   Icon(
                     Icons.lock_clock_outlined,
                     size: 14,
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: colors.onSurfaceMuted,
                   ),
-                  const SizedBox(width: 6),
+                  SizedBox(width: spacing.xxs + 2),
                   Text(
                     'Cierre: ${session.closedAt!.replaceAll('T', ' ').split('.').first}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: colors.onSurfaceMuted,
                     ),
                   ),
                 ],
               ),
             ],
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             Row(
               children: <Widget>[
                 Text(
@@ -554,7 +580,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: colors.onSurfaceMuted,
                   ),
                 ),
                 Text(
@@ -563,12 +589,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     fontFamily: 'monospace',
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: isClosed ? Colors.green.shade800 : null,
+                    color: isClosed ? colors.statusNormal : colors.onSurface,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: spacing.sm),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: <Widget>[
@@ -578,8 +604,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     icon: const Icon(Icons.verified_user_outlined, size: 16),
                     label: const Text('Ver Acta Firmada'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF0033A0),
-                      side: const BorderSide(color: Color(0xFF0033A0)),
+                      foregroundColor: colors.primary,
+                      side: BorderSide(color: colors.primary),
                     ),
                   )
                 else
@@ -588,7 +614,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     icon: const Icon(Icons.sensors, size: 16),
                     label: const Text('Reanudar Sesión'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0033A0),
+                      backgroundColor: colors.primary,
                     ),
                   ),
               ],
@@ -599,32 +625,37 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     );
   }
 
-  Widget _buildEmptySessionsView(ThemeData theme) {
+  Widget _buildEmptySessionsView() {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: spacing.insetsXl,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Icon(
               Icons.history_toggle_off,
               size: 56,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              color: colors.onSurfaceMuted.withValues(alpha: 0.6),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: spacing.md),
             Text(
               'No hay sesiones registradas',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: colors.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             Text(
               'Inicia una sesión de asistencia con el botón inferior para comenzar '
               'a tomar asistencia en el aula mediante Bluetooth Low Energy.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: colors.onSurfaceMuted,
               ),
             ),
           ],
@@ -634,61 +665,61 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Widget _buildCourseHeaderCard(
-    ThemeData theme,
     int count,
     int maxBits,
     double fraction,
   ) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Card(
-      margin: const EdgeInsets.all(16),
+      margin: spacing.insetsCard,
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
-        ),
-      ),
+      shape: radii.cardShape(side: BorderSide(color: colors.outlineVariant)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: spacing.insetsCard,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Row(
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
+                  padding: spacing.symmetric(
+                    horizontal: spacing.xs + 2,
+                    vertical: spacing.xxs,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.secondaryContainer,
-                    borderRadius: BorderRadius.circular(8),
+                    color: colors.secondaryContainer,
+                    borderRadius: radii.borderSm,
                   ),
                   child: Text(
                     widget.course.code,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSecondaryContainer,
+                      color: colors.onSecondaryContainer,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: spacing.xs),
                 Text(
                   'Grupo ${widget.course.groupCode}',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
+                    color: colors.onSurface,
                   ),
                 ),
                 const Spacer(),
                 Text(
                   'Semestre ${widget.course.semester}',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: colors.onSurfaceMuted,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: spacing.sm + 2),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
@@ -696,38 +727,39 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                   'Capacidad del Bitmap',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
+                    color: colors.onSurface,
                   ),
                 ),
                 Text(
                   '$count ocupados / $maxBits bits disponibles',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: count == maxBits
-                        ? theme.colorScheme.error
-                        : theme.colorScheme.primary,
+                        ? colors.statusPerdida
+                        : colors.primary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: radii.borderXs,
               child: LinearProgressIndicator(
                 value: fraction,
                 minHeight: 8,
-                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                backgroundColor: colors.surfaceContainerHigh,
                 valueColor: AlwaysStoppedAnimation<Color>(
                   count == maxBits
-                      ? theme.colorScheme.error
-                      : (theme.colorScheme.secondary),
+                      ? colors.statusPerdida
+                      : colors.secondary,
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: spacing.xxs + 2),
             Text(
               '${maxBits - count} cupos restantes para esta sección académica.',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: colors.onSurfaceMuted,
               ),
             ),
           ],
@@ -736,32 +768,37 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     );
   }
 
-  Widget _buildEmptyRosterView(ThemeData theme) {
+  Widget _buildEmptyRosterView() {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: spacing.insetsXl,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Icon(
               Icons.group_off_outlined,
               size: 56,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              color: colors.onSurfaceMuted.withValues(alpha: 0.6),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: spacing.md),
             Text(
               'No hay estudiantes inscritos',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: colors.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             Text(
               'Utiliza el botón superior para importar estudiantes desde un archivo '
               'Excel (.xlsx), CSV, texto pegado del SMA o mediante registro manual.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+                color: colors.onSurfaceMuted,
               ),
             ),
           ],
@@ -770,37 +807,37 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     );
   }
 
-  Widget _buildStudentTile(ThemeData theme, StudentModel student) {
+  Widget _buildStudentTile(StudentModel student) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     final bitPadded = student.bitIndex.toString().padLeft(2, '0');
 
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
+      shape: radii.cardShape(side: BorderSide(color: colors.outlineVariant)),
       child: ListTile(
         onTap: () => _showStudentQrDialog(student),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 4,
+        contentPadding: spacing.symmetric(
+          horizontal: spacing.sm + 2,
+          vertical: spacing.xxs,
         ),
         leading: Container(
           width: 52,
           height: 38,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
+            color: colors.primaryContainer,
+            borderRadius: radii.borderSm,
           ),
           child: Text(
             '#$bitPadded',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onPrimaryContainer,
+              color: colors.onPrimaryContainer,
               fontFamily: 'monospace',
               fontSize: 13,
             ),
@@ -808,7 +845,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         ),
         title: Text(
           student.fullName,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: colors.onSurface,
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -818,13 +858,15 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w500,
-                color: theme.colorScheme.primary,
+                color: colors.primary,
               ),
             ),
             if (student.email != null)
               Text(
                 student.email!,
-                style: theme.textTheme.bodySmall,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceMuted,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -833,25 +875,28 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         trailing: IconButton(
           icon: const Icon(Icons.qr_code_2),
           tooltip: 'Ver QR de enrolamiento',
-          color: theme.colorScheme.primary,
+          color: colors.primary,
           onPressed: () => _showStudentQrDialog(student),
         ),
       ),
     );
   }
 
-  Widget _buildBottomBleBar(ThemeData theme) {
+  Widget _buildBottomBleBar() {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: spacing.only(
+        left: spacing.md,
+        top: spacing.sm,
+        right: spacing.md,
+        bottom: spacing.md,
+      ),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: const Offset(0, -2),
-            blurRadius: 8,
-          ),
-        ],
+        color: colors.surfaceContainer,
+        border: Border(top: BorderSide(color: colors.outlineVariant)),
       ),
       child: SafeArea(
         top: false,
@@ -862,12 +907,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
             icon: const Icon(Icons.sensors),
             label: const Text('Iniciar Sesión de Asistencia BLE'),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF0033A0),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              backgroundColor: colors.primary,
+              foregroundColor: colors.onPrimary,
+              padding: spacing.symmetric(vertical: spacing.sm),
+              shape: radii.buttonShape(),
             ),
           ),
         ),

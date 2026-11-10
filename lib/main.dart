@@ -9,12 +9,7 @@ import 'features/student/student_courses_screen.dart';
 import 'features/teacher/course_detail_screen.dart';
 import 'features/teacher/course_reports_screen.dart';
 import 'features/teacher/courses_dashboard_screen.dart';
-
-/// Azul Institucional oficial de la Universidad de La Guajira.
-const Color uniguajiraBlue = Color(0xFF0033A0);
-
-/// Dorado Académico oficial de la Universidad de La Guajira.
-const Color uniguajiraGold = Color(0xFFEAAA00);
+import 'theme/theme.dart';
 
 void main() {
   runApp(const AsistenciaUniguajiraApp());
@@ -26,32 +21,12 @@ class AsistenciaUniguajiraApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: uniguajiraBlue,
-      primary: uniguajiraBlue,
-      secondary: uniguajiraGold,
-      brightness: Brightness.light,
-    );
-
     return MaterialApp(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: colorScheme,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: uniguajiraBlue,
-          foregroundColor: Colors.white,
-          elevation: 2,
-          centerTitle: true,
-        ),
-        cardTheme: const CardThemeData(
-          elevation: 1.5,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(16)),
-          ),
-        ),
-      ),
+      theme: AppTheme.buildLightTheme(),
+      darkTheme: AppTheme.buildDarkTheme(),
+      themeMode: ThemeMode.system,
       home: const RoleSelectorScreen(),
     );
   }
@@ -108,10 +83,11 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen> {
       );
     } catch (error) {
       if (!mounted) return;
+      final colors = AppColors.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al sembrar escenario: $error'),
-          backgroundColor: Colors.red.shade700,
+          backgroundColor: colors.statusPerdida,
         ),
       );
     } finally {
@@ -138,29 +114,31 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen> {
 
   /// Despliega la ficha técnica y créditos institucionales del proyecto de grado.
   void _showAboutProjectDialog() {
+    final colors = AppColors.of(context);
+    final radii = AppRadii.of(context);
+    final spacing = AppSpacing.of(context);
+
     showDialog<void>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(18)),
-        ),
-        title: const Row(
+        shape: radii.dialogShape(),
+        title: Row(
           children: <Widget>[
-            Icon(Icons.school_rounded, color: uniguajiraBlue, size: 28),
-            SizedBox(width: 12),
+            Icon(Icons.school_rounded, color: colors.primary, size: 28),
+            SizedBox(width: spacing.sm),
             Expanded(
               child: Text(
                 'Acerca del Proyecto de Grado',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
-                  color: uniguajiraBlue,
+                  color: colors.primary,
                 ),
               ),
             ),
           ],
         ),
-        content: const SingleChildScrollView(
+        content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,43 +148,47 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
-                  color: uniguajiraBlue,
+                  color: colors.primary,
                 ),
               ),
-              SizedBox(height: 16),
-              _CreditItem(
+              SizedBox(height: spacing.md),
+              const _CreditItem(
                 label: 'Autores',
                 value:
                     'Yoner De Jesus Isaza Vides (0182120016) y Álvaro Luis Garrido Medina (0182110072).',
               ),
-              SizedBox(height: 10),
-              _CreditItem(
+              SizedBox(height: spacing.xs),
+              const _CreditItem(
                 label: 'Asignatura',
                 value: 'Proyectos II',
               ),
-              SizedBox(height: 10),
-              _CreditItem(
+              SizedBox(height: spacing.xs),
+              const _CreditItem(
                 label: 'Docente',
                 value: 'Miguel Humberto Romero Acuña',
               ),
-              SizedBox(height: 10),
-              _CreditItem(
+              SizedBox(height: spacing.xs),
+              const _CreditItem(
                 label: 'Directora',
                 value: 'Lisseth Paola Castañeda Vega',
               ),
-              Divider(height: 24),
+              Divider(height: spacing.lg),
               Text(
                 'Resumen de Arquitectura',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
-                  color: Colors.black87,
+                  color: colors.onSurface,
                 ),
               ),
-              SizedBox(height: 6),
+              SizedBox(height: spacing.xxs),
               Text(
-                'Persistencia Offline-First SQLite v3, BLE Legacy Service UUID de 16 bytes (128 bits) sin GATT, rotación temporal HMAC-SHA256 cada 30s (±1 tick), Eco Docente con Mapa de Bits de 8 bytes (64 posiciones), Lista Invertida de excepción y exportación Excel .xlsx de 4 hojas con sincronización institucional @uniguajira.edu.co.',
-                style: TextStyle(fontSize: 12, height: 1.45),
+                'Persistencia Offline-First SQLite v3, BLE Legacy Service UUID de 16 bytes (128 bits) sin GATT, rotación temporal HMAC-SHA256 cada 30s (±1 tick), Eco Docente con Mapa de Bits de 8 bytes (64 posiciones), Lista Invertida de excepción y exportación Excel .xlsx de 4 hojas con sincronización institucional ${AppConstants.institutionalDomain}.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: colors.onSurfaceMuted,
+                ),
               ),
             ],
           ),
@@ -224,6 +206,9 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -247,7 +232,7 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            padding: spacing.symmetric(horizontal: spacing.md, vertical: spacing.lg),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 580),
               child: Column(
@@ -258,68 +243,68 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen> {
                   // -----------------------------------------------------------
                   Center(
                     child: Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: spacing.insetsMd,
                       decoration: BoxDecoration(
-                        color: uniguajiraBlue.withValues(alpha: 0.08),
+                        color: colors.primary.withValues(alpha: 0.08),
                         shape: BoxShape.circle,
-                        border: Border.all(color: uniguajiraGold, width: 2.5),
+                        border: Border.all(color: colors.secondary, width: 2.5),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.school_rounded,
                         size: 54,
-                        color: uniguajiraBlue,
+                        color: colors.primary,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: spacing.sm),
                   Text(
                     'Asistencia Multimodal Uniguajira',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: uniguajiraBlue,
+                      color: colors.primary,
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: spacing.xxs),
                   Text(
                     'Proximidad Criptográfica BLE (Bitmap 8B) + Lista Invertida Offline-First',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade700,
+                      color: colors.onSurfaceMuted,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: spacing.sm),
                   Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 6,
+                      padding: spacing.symmetric(
+                        horizontal: spacing.sm,
+                        vertical: spacing.xxs,
                       ),
                       decoration: BoxDecoration(
-                        color: uniguajiraBlue.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(20),
+                        color: colors.primary.withValues(alpha: 0.06),
+                        borderRadius: radii.borderPill,
                         border: Border.all(
-                          color: uniguajiraBlue.withValues(alpha: 0.25),
+                          color: colors.primary.withValues(alpha: 0.25),
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          const Icon(
+                          Icon(
                             Icons.verified_user_rounded,
                             size: 16,
-                            color: uniguajiraBlue,
+                            color: colors.primary,
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: spacing.xs),
                           Flexible(
                             child: Text(
                               'Costo de Servidor \$0 · Soberanía de Datos ${AppConstants.institutionalDomain}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: uniguajiraBlue,
+                                color: colors.primary,
                               ),
                             ),
                           ),
@@ -327,7 +312,7 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  SizedBox(height: spacing.lg),
 
                   // -----------------------------------------------------------
                   // 2. Panel Destacado: Modo Sustentación frente al Jurado
@@ -336,7 +321,7 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen> {
                     isSeeding: _isSeeding,
                     onStartDemo: _isSeeding ? null : _seedDemoScenario,
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: spacing.lg),
 
                   // -----------------------------------------------------------
                   // 3. Tarjetas Principales de Rol con Navegación Directa
@@ -347,10 +332,10 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen> {
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.1,
-                      color: Colors.grey.shade600,
+                      color: colors.onSurfaceMuted,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: spacing.xs),
                   _RoleOptionCard(
                     title: 'Modo Docente',
                     subtitle:
@@ -362,10 +347,10 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen> {
                       'Lista Invertida 1-Toque',
                       'Excel Oficial 4 Hojas',
                     ],
-                    accentColor: uniguajiraBlue,
+                    accentColor: colors.primary,
                     onTap: () => _navigateTo(const CoursesDashboardScreen()),
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: spacing.sm),
                   _RoleOptionCard(
                     title: 'Modo Estudiante',
                     subtitle:
@@ -377,46 +362,44 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen> {
                       'PIN Verbal Anti-Pasillo',
                       'Sello Criptográfico Verde',
                     ],
-                    accentColor: const Color(0xFF007A33),
+                    accentColor: colors.statusNormal,
                     onTap: () => _navigateTo(const StudentCoursesScreen()),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: spacing.lg),
 
                   // -----------------------------------------------------------
                   // 4. Modal de Diagnóstico de Permisos Hardware
                   // -----------------------------------------------------------
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
+                      padding: spacing.symmetric(
+                        horizontal: spacing.md,
+                        vertical: spacing.sm,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: radii.buttonShape(),
                     ),
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.settings_input_antenna_rounded,
-                      color: uniguajiraBlue,
+                      color: colors.primary,
                     ),
-                    label: const Text(
+                    label: Text(
                       'Diagnóstico de Permisos Hardware',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: uniguajiraBlue,
+                        color: colors.primary,
                       ),
                     ),
                     onPressed: _showHardwareDiagnosticModal,
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: spacing.xs),
 
                   // -----------------------------------------------------------
                   // 5. Botón Ficha Técnica y Créditos Oficiales
                   // -----------------------------------------------------------
                   TextButton.icon(
                     style: TextButton.styleFrom(
-                      foregroundColor: Colors.grey.shade700,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      foregroundColor: colors.onSurfaceMuted,
+                      padding: spacing.symmetric(vertical: spacing.xs),
                     ),
                     icon: const Icon(Icons.info_outline_rounded, size: 18),
                     label: const Text(
@@ -454,44 +437,45 @@ class _DefenseDemoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: uniguajiraGold, width: 2),
-      ),
+      elevation: 2,
+      shape: radii.cardShape(side: BorderSide(color: colors.secondary, width: 2)),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: radii.borderLg,
           gradient: LinearGradient(
             colors: <Color>[
-              const Color(0xFFFFFDF5),
-              uniguajiraGold.withValues(alpha: 0.08),
+              colors.surfaceContainer,
+              colors.secondaryContainer.withValues(alpha: 0.15),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
-        padding: const EdgeInsets.all(20),
+        padding: spacing.insetsCard,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Row(
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: spacing.insetsXs,
                   decoration: BoxDecoration(
-                    color: uniguajiraGold.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
+                    color: colors.secondaryContainer.withValues(alpha: 0.4),
+                    borderRadius: radii.borderSm,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.stars_rounded,
-                    color: Color(0xFF9E7000),
+                    color: colors.onSecondaryContainer,
                     size: 24,
                   ),
                 ),
-                const SizedBox(width: 12),
-                const Expanded(
+                SizedBox(width: spacing.sm),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -501,7 +485,7 @@ class _DefenseDemoCard extends StatelessWidget {
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1.0,
-                          color: Color(0xFF8A6500),
+                          color: colors.onSecondaryContainer,
                         ),
                       ),
                       Text(
@@ -509,7 +493,7 @@ class _DefenseDemoCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: uniguajiraBlue,
+                          color: colors.primary,
                         ),
                       ),
                     ],
@@ -517,37 +501,35 @@ class _DefenseDemoCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: spacing.sm),
             Text(
               'Siembra determinista con 12 estudiantes en Bitmap, 4 sesiones históricas cerradas, actas con firma HMAC-SHA256 y credencial del expositor activa.',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.4,
-                color: Colors.grey.shade800,
+                color: colors.onSurfaceMuted,
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: spacing.md),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: uniguajiraBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 14,
+                  backgroundColor: colors.primary,
+                  foregroundColor: colors.onPrimary,
+                  padding: spacing.symmetric(
+                    horizontal: spacing.md,
+                    vertical: spacing.sm,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: radii.buttonShape(),
                 ),
                 icon: isSeeding
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: colors.onPrimary,
                         ),
                       )
                     : const Icon(Icons.play_circle_filled_rounded),
@@ -590,17 +572,18 @@ class _RoleOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Card(
-      elevation: 1.5,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
+      elevation: 1,
+      shape: radii.cardShape(side: BorderSide(color: colors.outlineVariant)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: radii.borderLg,
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: spacing.insetsCard,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -608,14 +591,14 @@ class _RoleOptionCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: spacing.insetsSm,
                     decoration: BoxDecoration(
                       color: accentColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: radii.borderMd,
                     ),
                     child: Icon(icon, color: accentColor, size: 28),
                   ),
-                  const SizedBox(width: 14),
+                  SizedBox(width: spacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -628,30 +611,30 @@ class _RoleOptionCard extends StatelessWidget {
                             color: accentColor,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: spacing.xxs),
                         Text(
                           subtitle,
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: Colors.grey.shade700,
+                            color: colors.onSurfaceMuted,
                             height: 1.3,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: spacing.xs),
                   Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 16,
-                    color: Colors.grey.shade400,
+                    color: colors.outline,
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: spacing.sm),
               Wrap(
-                spacing: 6,
-                runSpacing: 6,
+                spacing: spacing.xs,
+                runSpacing: spacing.xs,
                 children: capabilities
                     .map((cap) => _CapabilityBadge(label: cap))
                     .toList(growable: false),
@@ -672,19 +655,23 @@ class _CapabilityBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: colors.surfaceContainerHigh,
+        borderRadius: radii.borderXs,
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF334155),
+          color: colors.onSurface,
         ),
       ),
     );
@@ -708,35 +695,50 @@ class _DefenseDemoResultDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return AlertDialog(
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(18)),
+      shape: radii.dialogShape(),
+      titlePadding: spacing.only(
+        left: spacing.lg,
+        top: spacing.lg,
+        right: spacing.lg,
+        bottom: spacing.xs,
       ),
-      titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      contentPadding: spacing.symmetric(
+        horizontal: spacing.lg,
+        vertical: spacing.sm,
+      ),
+      actionsPadding: spacing.only(
+        left: spacing.lg,
+        top: spacing.xs,
+        right: spacing.lg,
+        bottom: spacing.md,
+      ),
       title: Row(
         children: <Widget>[
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: spacing.insetsXs,
             decoration: BoxDecoration(
-              color: uniguajiraGold.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(8),
+              color: colors.secondaryContainer.withValues(alpha: 0.3),
+              borderRadius: radii.borderSm,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.verified_rounded,
-              color: Color(0xFF9E7000),
+              color: colors.onSecondaryContainer,
               size: 26,
             ),
           ),
-          const SizedBox(width: 12),
-          const Expanded(
+          SizedBox(width: spacing.sm),
+          Expanded(
             child: Text(
               'Escenario de Sustentación Listo',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 17,
-                color: uniguajiraBlue,
+                color: colors.primary,
               ),
             ),
           ),
@@ -749,58 +751,57 @@ class _DefenseDemoResultDialog extends StatelessWidget {
           children: <Widget>[
             Text(
               'El motor determinista preparó con éxito la persistencia SQLite v3 con los siguientes parámetros oficiales:',
-              style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12.5, color: colors.onSurfaceMuted),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: spacing.sm),
             _DefenseSummaryRow(
               icon: Icons.menu_book_rounded,
               title: 'Asignatura',
               content:
                   '${result.course.name} (${result.course.code} · Grupo ${result.course.groupCode} · Semestre ${result.course.semester})',
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: spacing.xs),
             _DefenseSummaryRow(
               icon: Icons.people_alt_rounded,
               title: 'Nómina',
               content:
                   '${result.studentsSeeded} estudiantes matriculados (Bits 00 al 11, incluyendo ${DemoSeedService.primaryStudentCode} y ${DemoSeedService.secondaryStudentCode})',
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: spacing.xs),
             _DefenseSummaryRow(
               icon: Icons.history_edu_rounded,
               title: 'Auditoría',
               content:
                   '${result.closedSessionsSeeded} sesiones históricas cerradas y ${result.signedActasCount} actas firmadas con HMAC-SHA256',
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: spacing.xs),
             _DefenseSummaryRow(
               icon: Icons.account_balance_wallet_rounded,
               title: 'Billetera Estudiante',
               content:
                   'Credencial Bit 0${result.enrolledBitIndex} (${result.enrolledStudentCode}) auto-enrolada y activa',
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: spacing.md),
             Text(
               'ACCESOS DIRECTOS PARA LA DEMOSTRACIÓN:',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.8,
-                color: Colors.grey.shade600,
+                color: colors.onSurfaceMuted,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: uniguajiraBlue,
+                backgroundColor: colors.primary,
+                foregroundColor: colors.onPrimary,
                 alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 11,
+                padding: spacing.symmetric(
+                  horizontal: spacing.sm,
+                  vertical: spacing.xs,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                shape: radii.buttonShape(),
               ),
               icon: const Icon(Icons.co_present_rounded, size: 20),
               label: const Text(
@@ -809,18 +810,16 @@ class _DefenseDemoResultDialog extends StatelessWidget {
               ),
               onPressed: onOpenTeacherCourse,
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                foregroundColor: uniguajiraBlue,
+                foregroundColor: colors.primary,
                 alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 11,
+                padding: spacing.symmetric(
+                  horizontal: spacing.sm,
+                  vertical: spacing.xs,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                shape: radii.buttonShape(),
               ),
               icon: const Icon(Icons.table_chart_rounded, size: 20),
               label: const Text(
@@ -829,18 +828,17 @@ class _DefenseDemoResultDialog extends StatelessWidget {
               ),
               onPressed: onOpenReports,
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF007A33),
+                foregroundColor: colors.statusNormal,
+                side: BorderSide(color: colors.statusNormal, width: colors.hairlineWidth),
                 alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 11,
+                padding: spacing.symmetric(
+                  horizontal: spacing.sm,
+                  vertical: spacing.xs,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                shape: radii.buttonShape(),
               ),
               icon: const Icon(Icons.badge_rounded, size: 20),
               label: const Text(
@@ -876,37 +874,41 @@ class _DefenseSummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: spacing.insetsSm,
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: colors.surfaceContainerLow,
+        borderRadius: radii.borderSm,
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(icon, size: 18, color: uniguajiraBlue),
-          const SizedBox(width: 10),
+          Icon(icon, size: 18, color: colors.primary),
+          SizedBox(width: spacing.xs),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF475569),
+                    color: colors.onSurfaceMuted,
                   ),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: spacing.xxs),
                 Text(
                   content,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF0F172A),
+                    color: colors.onSurface,
                   ),
                 ),
               ],
@@ -979,21 +981,25 @@ class _AndroidHardwareDiagnosticDialogState
     }
   }
 
-  Widget _buildStatusChip(PermissionStatus? status) {
+  Widget _buildStatusChip(BuildContext context, PermissionStatus? status) {
     if (status == null) {
       return const SizedBox.shrink();
     }
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     if (status.isGranted) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
         decoration: BoxDecoration(
-          color: const Color(0xFFDCFCE7),
-          borderRadius: BorderRadius.circular(6),
+          color: colors.statusNormalContainer,
+          borderRadius: radii.borderXs,
         ),
-        child: const Text(
+        child: Text(
           'Concedido',
           style: TextStyle(
-            color: Color(0xFF15803D),
+            color: colors.onStatusNormalContainer,
             fontSize: 11,
             fontWeight: FontWeight.w700,
           ),
@@ -1002,15 +1008,15 @@ class _AndroidHardwareDiagnosticDialogState
     }
     if (status.isPermanentlyDenied) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
         decoration: BoxDecoration(
-          color: const Color(0xFFFEE2E2),
-          borderRadius: BorderRadius.circular(6),
+          color: colors.statusPerdidaContainer,
+          borderRadius: radii.borderXs,
         ),
-        child: const Text(
+        child: Text(
           'Bloqueado',
           style: TextStyle(
-            color: Color(0xFFB91C1C),
+            color: colors.onStatusPerdidaContainer,
             fontSize: 11,
             fontWeight: FontWeight.w700,
           ),
@@ -1018,15 +1024,15 @@ class _AndroidHardwareDiagnosticDialogState
       );
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF3C7),
-        borderRadius: BorderRadius.circular(6),
+        color: colors.statusAlertaContainer,
+        borderRadius: radii.borderXs,
       ),
-      child: const Text(
+      child: Text(
         'Denegado',
         style: TextStyle(
-          color: Color(0xFFB45309),
+          color: colors.onStatusAlertaContainer,
           fontSize: 11,
           fontWeight: FontWeight.w700,
         ),
@@ -1036,15 +1042,17 @@ class _AndroidHardwareDiagnosticDialogState
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return AlertDialog(
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(18)),
-      ),
-      title: const Row(
+      shape: radii.dialogShape(),
+      title: Row(
         children: <Widget>[
-          Icon(Icons.build_circle_rounded, color: uniguajiraBlue, size: 26),
-          SizedBox(width: 10),
-          Expanded(
+          Icon(Icons.build_circle_rounded, color: colors.primary, size: 26),
+          SizedBox(width: spacing.xs),
+          const Expanded(
             child: Text(
               'Diagnóstico de Permisos Hardware',
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
@@ -1059,27 +1067,27 @@ class _AndroidHardwareDiagnosticDialogState
           children: <Widget>[
             Text(
               'Estado de los canales de hardware necesarios para proximidad BLE y escaneo QR en dispositivos Android:',
-              style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12.5, color: colors.onSurfaceMuted),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: spacing.sm),
             if (_isLoading)
-              const Center(
+              Center(
                 child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: CircularProgressIndicator(),
+                  padding: spacing.insetsLg,
+                  child: const CircularProgressIndicator(),
                 ),
               )
             else
               ..._permissions.map((entry) {
                 final status = _statuses[entry.key];
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: spacing.only(bottom: spacing.xs),
                   child: Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: spacing.insetsSm,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      color: colors.surfaceContainerLow,
+                      borderRadius: radii.borderSm,
+                      border: Border.all(color: colors.outlineVariant),
                     ),
                     child: Row(
                       children: <Widget>[
@@ -1088,11 +1096,11 @@ class _AndroidHardwareDiagnosticDialogState
                               ? Icons.check_circle_rounded
                               : Icons.warning_amber_rounded,
                           color: status?.isGranted ?? false
-                              ? const Color(0xFF16A34A)
-                              : const Color(0xFFD97706),
+                              ? colors.statusNormal
+                              : colors.statusAlerta,
                           size: 20,
                         ),
-                        const SizedBox(width: 10),
+                        SizedBox(width: spacing.xs),
                         Expanded(
                           child: Text(
                             entry.value,
@@ -1102,24 +1110,22 @@ class _AndroidHardwareDiagnosticDialogState
                             ),
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        _buildStatusChip(status),
+                        SizedBox(width: spacing.xxs),
+                        _buildStatusChip(context, status),
                       ],
                     ),
                   ),
                 );
               }),
-            const SizedBox(height: 12),
+            SizedBox(height: spacing.sm),
             Row(
               children: <Widget>[
                 Expanded(
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
-                      backgroundColor: uniguajiraBlue,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                      backgroundColor: colors.primary,
+                      padding: spacing.symmetric(vertical: spacing.sm),
+                      shape: radii.buttonShape(),
                     ),
                     icon: const Icon(Icons.security_update_good_rounded, size: 18),
                     label: const Text(
@@ -1129,22 +1135,20 @@ class _AndroidHardwareDiagnosticDialogState
                     onPressed: _isLoading ? null : _requestPermissions,
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: spacing.xs),
                 IconButton(
                   tooltip: 'Reverificar permisos',
-                  icon: const Icon(Icons.refresh_rounded, color: uniguajiraBlue),
+                  icon: Icon(Icons.refresh_rounded, color: colors.primary),
                   onPressed: _isLoading ? null : _checkPermissions,
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: spacing.xs),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                foregroundColor: uniguajiraBlue,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                foregroundColor: colors.primary,
+                padding: spacing.symmetric(vertical: spacing.sm),
+                shape: radii.buttonShape(),
               ),
               icon: const Icon(Icons.settings_outlined, size: 18),
               label: const Text(
@@ -1172,15 +1176,17 @@ class _DesktopHardwareDiagnosticDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+    final radii = AppRadii.of(context);
+
     return AlertDialog(
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(18)),
-      ),
-      title: const Row(
+      shape: radii.dialogShape(),
+      title: Row(
         children: <Widget>[
-          Icon(Icons.desktop_windows_rounded, color: uniguajiraBlue, size: 26),
-          SizedBox(width: 10),
-          Expanded(
+          Icon(Icons.desktop_windows_rounded, color: colors.primary, size: 26),
+          SizedBox(width: spacing.xs),
+          const Expanded(
             child: Text(
               'Diagnóstico de Permisos Hardware',
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
@@ -1194,26 +1200,26 @@ class _DesktopHardwareDiagnosticDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: spacing.insetsSm,
               decoration: BoxDecoration(
-                color: const Color(0xFFDCFCE7),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF86EFAC)),
+                color: colors.statusNormalContainer,
+                borderRadius: radii.borderSm,
+                border: Border.all(color: colors.statusNormal.withValues(alpha: 0.3)),
               ),
-              child: const Row(
+              child: Row(
                 children: <Widget>[
                   Icon(
                     Icons.check_circle_rounded,
-                    color: Color(0xFF15803D),
+                    color: colors.statusNormal,
                     size: 22,
                   ),
-                  SizedBox(width: 10),
+                  SizedBox(width: spacing.xs),
                   Expanded(
                     child: Text(
                       'Entorno Linux Desktop / Prueba FFI Detectado — Simulación BLE Activa',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF14532D),
+                        color: colors.onStatusNormalContainer,
                         fontSize: 12.5,
                       ),
                     ),
@@ -1221,7 +1227,7 @@ class _DesktopHardwareDiagnosticDialog extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: spacing.sm),
             Text(
               'La aplicación está ejecutándose en un entorno de pruebas o escritorio Linux sin acceso a los servicios nativos de Android:\n\n'
               '• Persistencia SQLite v3: Operativa mediante driver C nativo (sqflite_common_ffi).\n'
@@ -1231,7 +1237,7 @@ class _DesktopHardwareDiagnosticDialog extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.45,
-                color: Colors.grey.shade800,
+                color: colors.onSurfaceMuted,
               ),
             ),
           ],
@@ -1259,6 +1265,9 @@ class _CreditItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final spacing = AppSpacing.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -1268,16 +1277,16 @@ class _CreditItem extends StatelessWidget {
             fontSize: 11,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.8,
-            color: Colors.grey.shade600,
+            color: colors.onSurfaceMuted,
           ),
         ),
-        const SizedBox(height: 2),
+        SizedBox(height: spacing.xxs),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF0F172A),
+            color: colors.onSurface,
           ),
         ),
       ],
