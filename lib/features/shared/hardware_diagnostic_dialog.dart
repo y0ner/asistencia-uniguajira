@@ -55,10 +55,15 @@ class HardwareDiagnosticDialog extends StatefulWidget {
   const HardwareDiagnosticDialog({
     super.key,
     this.isAndroid12OrHigherOverride,
+    this.permissionChecker,
   });
 
   /// Permite fijar el valor de versión de Android para pruebas unitarias y de widgets.
   final bool? isAndroid12OrHigherOverride;
+
+  /// Función opcional para consultar el estado de los permisos (por defecto la plataforma vía permission_handler).
+  final Future<PermissionStatus> Function(Permission permission)?
+      permissionChecker;
 
   @override
   State<HardwareDiagnosticDialog> createState() =>
@@ -74,6 +79,13 @@ class _HardwareDiagnosticDialogState extends State<HardwareDiagnosticDialog> {
   void initState() {
     super.initState();
     _initAndCheckPermissions();
+  }
+
+  Future<PermissionStatus> _checkPermission(Permission permission) async {
+    if (widget.permissionChecker != null) {
+      return widget.permissionChecker!(permission);
+    }
+    return permission.status;
   }
 
   Future<void> _initAndCheckPermissions() async {
@@ -109,7 +121,7 @@ class _HardwareDiagnosticDialogState extends State<HardwareDiagnosticDialog> {
     final results = <Permission, PermissionStatus>{};
     for (final entry in permissions) {
       try {
-        results[entry.key] = await entry.key.status;
+        results[entry.key] = await _checkPermission(entry.key);
       } catch (e) {
         debugPrint('Error al verificar permiso ${entry.key}: $e');
         results[entry.key] = PermissionStatus.denied;
@@ -138,7 +150,7 @@ class _HardwareDiagnosticDialogState extends State<HardwareDiagnosticDialog> {
       final results = <Permission, PermissionStatus>{};
       for (final entry in _permissions) {
         try {
-          results[entry.key] = await entry.key.status;
+          results[entry.key] = await _checkPermission(entry.key);
         } catch (e) {
           debugPrint('Error al verificar permiso ${entry.key}: $e');
           results[entry.key] = PermissionStatus.denied;

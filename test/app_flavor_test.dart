@@ -3,8 +3,10 @@ import 'package:asistencia_uniguajira/app/asistencia_app.dart';
 import 'package:asistencia_uniguajira/features/shared/hardware_diagnostic_dialog.dart';
 import 'package:asistencia_uniguajira/features/student/student_courses_screen.dart';
 import 'package:asistencia_uniguajira/features/teacher/courses_dashboard_screen.dart';
+import 'package:asistencia_uniguajira/theme/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -56,14 +58,16 @@ void main() {
         await tester.pump();
 
         await tester.tap(find.byIcon(Icons.bluetooth_searching));
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.byType(DesktopHardwareDiagnosticDialog), findsOneWidget);
         expect(find.text('Diagnóstico de Permisos Hardware'), findsOneWidget);
         expect(find.text('Entendido'), findsOneWidget);
 
         await tester.tap(find.text('Entendido'));
-        await tester.pumpAndSettle();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
         expect(find.byType(DesktopHardwareDiagnosticDialog), findsNothing);
       },
     );
@@ -74,13 +78,18 @@ void main() {
       'HardwareDiagnosticDialog excluye ubicación en Android 12 o superior',
       (WidgetTester tester) async {
         await tester.pumpWidget(
-          const MaterialApp(
+          MaterialApp(
+            theme: AppTheme.buildLightTheme(),
             home: Scaffold(
-              body: HardwareDiagnosticDialog(isAndroid12OrHigherOverride: true),
+              body: HardwareDiagnosticDialog(
+                isAndroid12OrHigherOverride: true,
+                permissionChecker: (_) async => PermissionStatus.granted,
+              ),
             ),
           ),
         );
         await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.textContaining('Bluetooth Scan'), findsOneWidget);
         expect(find.textContaining('Bluetooth Advertise'), findsOneWidget);
@@ -94,13 +103,18 @@ void main() {
       'HardwareDiagnosticDialog incluye ubicación en Android 11 o inferior',
       (WidgetTester tester) async {
         await tester.pumpWidget(
-          const MaterialApp(
+          MaterialApp(
+            theme: AppTheme.buildLightTheme(),
             home: Scaffold(
-              body: HardwareDiagnosticDialog(isAndroid12OrHigherOverride: false),
+              body: HardwareDiagnosticDialog(
+                isAndroid12OrHigherOverride: false,
+                permissionChecker: (_) async => PermissionStatus.granted,
+              ),
             ),
           ),
         );
         await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.textContaining('Bluetooth Scan'), findsOneWidget);
         expect(find.textContaining('Bluetooth Advertise'), findsOneWidget);
