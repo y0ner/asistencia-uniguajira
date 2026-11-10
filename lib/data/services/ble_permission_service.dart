@@ -1,11 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:permission_handler/permission_handler.dart' as ph
     show openAppSettings;
+
+import '../../core/platform/android_sdk.dart';
 
 /// Tipos funcionales para inyección de dependencias en [BlePermissionService].
 typedef AndroidSdkVersionProvider = FutureOr<int> Function();
@@ -142,7 +143,10 @@ class BlePermissionService {
           .first
           .timeout(const Duration(seconds: 2));
       isBtOn = state == BluetoothAdapterState.on;
-    } catch (_) {
+    } catch (error) {
+      debugPrint(
+        'No se pudo leer el estado del adaptador en 2 s: $error; se asume apagado.',
+      );
       isBtOn = false;
     }
 
@@ -177,30 +181,19 @@ class BlePermissionService {
   Future<bool> openAppSettings() => _openAppSettingsAction();
 
   static Future<int> _defaultAndroidSdkVersion() async {
-    if (defaultTargetPlatform != TargetPlatform.android) {
-      return 33;
-    }
     try {
-      const channel = MethodChannel('com.tekartik.sqflite');
-      final versionStr = await channel.invokeMethod<String>(
-        'getPlatformVersion',
-      );
-      if (versionStr != null) {
-        final match = RegExp(r'Android\s+(\d+)').firstMatch(versionStr);
-        if (match != null) {
-          final release = int.tryParse(match.group(1)!);
-          if (release != null) {
-            if (release <= 11) {
-              return 30;
-            }
-            return 31;
-          }
-        }
+      final sdk = await androidSdkInt();
+      if (sdk != null) {
+        return sdk;
       }
-    } catch (_) {
-      // Fallback a Android moderno
+      return 33;
+    } catch (error) {
+      debugPrint(
+        'No se pudo determinar el SDK de Android: $error; '
+        'se asume Android 12+ (SDK 31).',
+      );
+      return 31;
     }
-    return 33;
   }
 
   static Future<PermissionStatus> _defaultCheckStatus(

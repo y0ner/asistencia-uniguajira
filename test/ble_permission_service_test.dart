@@ -1,4 +1,6 @@
+import 'package:asistencia_uniguajira/core/platform/android_sdk.dart';
 import 'package:asistencia_uniguajira/data/services/ble_permission_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -162,6 +164,38 @@ void main() {
       expect(turnedOn, isTrue);
       expect(openedSettings, isTrue);
       expect(opened, isTrue);
+    });
+
+    test('7. Proveedor por defecto asume 31 o superior si falla la plataforma', () async {
+      final checked = <Permission>[];
+      final service = BlePermissionService(
+        // Sin androidSdkVersionProvider: usa el proveedor por defecto
+        permissionStatusChecker: (Permission p) async {
+          checked.add(p);
+          return PermissionStatus.granted;
+        },
+        permissionRequester: (List<Permission> list) async =>
+            <Permission, PermissionStatus>{},
+        bluetoothAdapterStateProvider: () =>
+            Stream<BluetoothAdapterState>.value(BluetoothAdapterState.on),
+      );
+
+      final result = await service.ensureReady();
+      expect(result.isReady, isTrue);
+      // Al asumir SDK >= 31, chequea los permisos de Android 12+
+      expect(checked, contains(Permission.bluetoothScan));
+      expect(checked, contains(Permission.bluetoothAdvertise));
+      expect(checked, contains(Permission.bluetoothConnect));
+    });
+
+    test('8. androidSdkInt devuelve null en plataformas no-Android', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        final sdk = await androidSdkInt();
+        expect(sdk, isNull);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
   });
 }

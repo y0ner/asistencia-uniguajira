@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_ble_peripheral/flutter_ble_peripheral.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
@@ -182,7 +182,7 @@ class BleAttendanceService {
   /// periférico. Si ya hay un anuncio activo, lo detiene y espera antes de
   /// iniciar el siguiente. Si el paquete es idéntico al anunciado actualmente,
   /// no reinicia el anuncio.
-  Future<void> startAdvertisingPacket(Uint8List packet16) {
+  Future<void> startAdvertisingPacket(Uint8List packet16) async {
     _ensureNotDisposed();
     _validatePacket(packet16);
 
@@ -301,7 +301,7 @@ class BleAttendanceService {
   }
 
   /// Detiene el anuncio BLE activo esperando a que la cola complete.
-  Future<void> stopAdvertising() {
+  Future<void> stopAdvertising() async {
     final completer = Completer<void>();
     _adQueue = _adQueue.then((_) async {
       try {
@@ -390,8 +390,11 @@ class BleAttendanceService {
           );
         },
       );
-    } catch (_) {
-      // Ignorar fallo de escucha de adaptador en entornos sin implementación nativa
+    } catch (error) {
+      debugPrint(
+        'No se pudo monitorear el estado del adaptador Bluetooth: $error. '
+        'Se continuará sin monitoreo reactivo del adaptador.',
+      );
     }
   }
 
