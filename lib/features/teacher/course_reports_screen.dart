@@ -12,6 +12,7 @@ import '../../core/models/session_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/cloud_sync_service.dart';
 import '../../data/services/excel_report_service.dart';
+import '../../data/services/report_share_service.dart';
 import '../../theme/theme.dart';
 import 'live_attendance_session_screen.dart';
 import 'signed_acta_dialog.dart';
@@ -33,6 +34,7 @@ class CourseReportsScreen extends StatefulWidget {
     this.database,
     this.excelService,
     this.cloudSyncService,
+    this.reportShareService,
   });
 
   /// Curso institucional objeto del reporte.
@@ -47,158 +49,17 @@ class CourseReportsScreen extends StatefulWidget {
   /// Servicio de sincronización institucional opcional.
   final CloudSyncService? cloudSyncService;
 
-  @override
-  State<CourseReportsScreen> createState() => _CourseReportsScreenState();
-}
+  /// Servicio para compartir reportes institucionales opcional.
+  final ReportShareService? reportShareService;
 
-class _CourseReportsScreenState extends State<CourseReportsScreen> {
-  late final AppDatabase _database;
-  late final ExcelReportService _excelService;
-  late final CloudSyncService _cloudSyncService;
-  final TextEditingController _institutionalEmailController =
-      TextEditingController();
-  final GlobalKey<FormState> _syncFormKey = GlobalKey<FormState>();
-
-  bool _isLoading = true;
-  bool _isExporting = false;
-  bool _isSyncing = false;
-  String? _loadError;
-
-  CourseAttendanceSummary? _summary;
-  List<SessionModel> _sessions = <SessionModel>[];
-  Map<String, String?> _actaSignatures = <String, String?>{};
-  Map<String, String?> _actaJsons = <String, String?>{};
-
-  String _studentFilter = 'ALL';
-  String _searchQuery = '';
-  CloudSyncResult? _lastSyncResult;
-
-  @override
-  void initState() {
-    super.initState();
-    _database = widget.database ?? AppDatabase.instance;
-    _excelService =
-        widget.excelService ?? ExcelReportService(database: _database);
-    _cloudSyncService =
-        widget.cloudSyncService ??
-        CloudSyncService(
-          database: _database,
-          excelReportService: _excelService,
-        );
-    _loadReportData();
-  }
-
-  @override
-  void dispose() {
-    _institutionalEmailController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadReportData() async {
-    setState(() {
-      _isLoading = true;
-      _loadError = null;
-    });
-
-    try {
-      final summary = await _excelService.buildCourseSummary(widget.course.id);
-      final sessions = await _database.getSessionsByCourse(widget.course.id);
-
-      final signatures = <String, String?>{};
-      final jsons = <String, String?>{};
-
-      for (final session in sessions) {
-        signatures[session.id] = await _database.getSessionActaSignature(
-          session.id,
-        );
-        jsons[session.id] = await _database.getSessionActaJson(session.id);
-      }
-
-      if (mounted) {
-        setState(() {
-          _summary = summary;
-          _sessions = sessions;
-          _actaSignatures = signatures;
-          _actaJsons = jsons;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loadError = e.toString();
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<String> _resolveExportDirectory() async {
-    // Si existe la carpeta pública de descargas de Android, priorizarla para fácil acceso.
-    final downloadsDir = Directory('/storage/emulated/0/Download');
-    if (await downloadsDir.exists()) {
-      return downloadsDir.path;
-    }
-
-    try {
-      final databasesDir = await getDatabasesPath();
-      final reportsDir = Directory(p.join(databasesDir, 'reports'));
-      if (!await reportsDir.exists()) {
-        await reportsDir.create(recursive: true);
-      }
-      return reportsDir.path;
-    } catch (_) {
-      final tempDir = Directory(p.join(Directory.systemTemp.path, 'reports'));
-      if (!await tempDir.exists()) {
-        await tempDir.create(recursive: true);
-      }
-      return tempDir.path;
-    }
-  }
-
-  Future<void> _exportOfficialExcelWorkbook() async {
-    if (_isExporting) return;
-
-    setState(() => _isExporting = true);
-
-    try {
-      final targetDirectory = await _resolveExportDirectory();
-      final filePath = await _excelService.exportWorkbookToFile(
-        courseId: widget.course.id,
-        directoryPath: targetDirectory,
-      );
-
-      final file = File(filePath);
-      final fileSizeBytes = await file.exists() ? await file.length() : 0;
-      final summary = _summary ?? await _excelService.buildCourseSummary(widget.course.id);
-      final hmacSha256 = summary.reportHmacSha256;
-
-      if (!mounted) return;
-      setState(() => _isExporting = false);
-
-      await _showExportSuccessDialog(
-        filePath: filePath,
-        fileSizeBytes: fileSizeBytes,
-        hmacSha256: hmacSha256,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      final colors = AppColors.of(context);
-      setState(() => _isExporting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al exportar libro Excel: $e'),
-          backgroundColor: colors.statusPerdida,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-  }
-
-  Future<void> _showExportSuccessDialog({
+  /// Despliega el diálogo institucional de exportación exitosa con las acciones
+  /// requeridas: "Compartir" (principal) y "Cerrar".
+  static Future<void> showExportSuccessDialog({
+    required BuildContext context,
     required String filePath,
     required int fileSizeBytes,
     required String hmacSha256,
+    required Future<void> Function() onShare,
   }) async {
     final colors = AppColors.of(context);
     final spacing = AppSpacing.of(context);
@@ -246,15 +107,35 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                   style: TextStyle(color: colors.onSurfaceMuted, fontSize: 13),
                 ),
                 SizedBox(height: spacing.md),
-                _buildInfoRow('Archivo:', fileName, isBold: true),
+                _buildInfoRowStatic(context, 'Archivo:', fileName, isBold: true),
                 SizedBox(height: spacing.xxs),
-                _buildInfoRow('Tamaño:', '$fileSizeBytes bytes ($sizeKb KB)'),
+                _buildInfoRowStatic(context, 'Tamaño:', '$fileSizeBytes bytes ($sizeKb KB)'),
                 SizedBox(height: spacing.xxs),
-                _buildInfoRow('Hojas:', '4 (Resumen, Detalle, Sesiones, Metadatos)'),
+                _buildInfoRowStatic(context, 'Hojas:', '4 (Resumen, Detalle, Sesiones, Metadatos)'),
                 SizedBox(height: spacing.sm),
-                Text(
-                  'Ruta en almacenamiento:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.onSurface),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        'Ruta en almacenamiento:',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.onSurface),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy_rounded, size: 16),
+                      tooltip: 'Copiar ruta',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: filePath));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Ruta del archivo copiada al portapapeles.'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
                 SizedBox(height: spacing.xxs),
                 Container(
@@ -301,25 +182,20 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
             ),
           ),
           actions: <Widget>[
-            TextButton.icon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: filePath));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Ruta del archivo copiada al portapapeles.'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.copy, size: 16),
-              label: const Text('Copiar Ruta'),
-            ),
-            FilledButton(
+            TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cerrar'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                onShare();
+              },
+              icon: const Icon(Icons.share_rounded, size: 18),
+              label: const Text('Compartir'),
               style: FilledButton.styleFrom(
                 backgroundColor: colors.primary,
               ),
-              child: const Text('Aceptar'),
             ),
           ],
         );
@@ -327,7 +203,12 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {bool isBold = false}) {
+  static Widget _buildInfoRowStatic(
+    BuildContext context,
+    String label,
+    String value, {
+    bool isBold = false,
+  }) {
     final colors = AppColors.of(context);
 
     return Row(
@@ -356,6 +237,286 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
         ),
       ],
     );
+  }
+
+  @override
+  State<CourseReportsScreen> createState() => _CourseReportsScreenState();
+}
+
+class _CourseReportsScreenState extends State<CourseReportsScreen> {
+  late final AppDatabase _database;
+  late final ExcelReportService _excelService;
+  late final CloudSyncService _cloudSyncService;
+  late final ReportShareService _reportShareService;
+  final TextEditingController _institutionalEmailController =
+      TextEditingController();
+  final GlobalKey<FormState> _syncFormKey = GlobalKey<FormState>();
+
+  bool _isLoading = true;
+  bool _isExporting = false;
+  bool _isSharing = false;
+  bool _isSyncing = false;
+  String? _loadError;
+  String? _latestExportedFilePath;
+
+  CourseAttendanceSummary? _summary;
+  List<SessionModel> _sessions = <SessionModel>[];
+  Map<String, String?> _actaSignatures = <String, String?>{};
+  Map<String, String?> _actaJsons = <String, String?>{};
+
+  String _studentFilter = 'ALL';
+  String _searchQuery = '';
+  CloudSyncResult? _lastSyncResult;
+
+  @override
+  void initState() {
+    super.initState();
+    _database = widget.database ?? AppDatabase.instance;
+    _excelService =
+        widget.excelService ?? ExcelReportService(database: _database);
+    _cloudSyncService =
+        widget.cloudSyncService ??
+        CloudSyncService(
+          database: _database,
+          excelReportService: _excelService,
+        );
+    _reportShareService =
+        widget.reportShareService ?? ReportShareService();
+    _loadReportData();
+  }
+
+  @override
+  void dispose() {
+    _institutionalEmailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadReportData() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final summary = await _excelService.buildCourseSummary(widget.course.id);
+      final sessions = await _database.getSessionsByCourse(widget.course.id);
+
+      final signatures = <String, String?>{};
+      final jsons = <String, String?>{};
+
+      for (final session in sessions) {
+        signatures[session.id] = await _database.getSessionActaSignature(
+          session.id,
+        );
+        jsons[session.id] = await _database.getSessionActaJson(session.id);
+      }
+
+      if (mounted) {
+        setState(() {
+          _summary = summary;
+          _sessions = sessions;
+          _actaSignatures = signatures;
+          _actaJsons = jsons;
+          _isLoading = false;
+        });
+        await _checkLatestExportedFile();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadError = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<String> _resolveExportDirectory() async {
+    // Si existe la carpeta pública de descargas de Android, priorizarla para fácil acceso.
+    final downloadsDir = Directory('/storage/emulated/0/Download');
+    if (await downloadsDir.exists()) {
+      return downloadsDir.path;
+    }
+
+    try {
+      final databasesDir = await getDatabasesPath();
+      final reportsDir = Directory(p.join(databasesDir, 'reports'));
+      if (!await reportsDir.exists()) {
+        await reportsDir.create(recursive: true);
+      }
+      return reportsDir.path;
+    } catch (e) {
+      debugPrint('No se pudo acceder a getDatabasesPath para reportes: $e');
+      final tempDir = Directory(p.join(Directory.systemTemp.path, 'reports'));
+      if (!await tempDir.exists()) {
+        await tempDir.create(recursive: true);
+      }
+      return tempDir.path;
+    }
+  }
+
+  Future<void> _checkLatestExportedFile() async {
+    try {
+      final directoryPath = await _resolveExportDirectory();
+      final directory = Directory(directoryPath);
+      if (!await directory.exists()) {
+        if (mounted) {
+          setState(() => _latestExportedFilePath = null);
+        }
+        return;
+      }
+
+      final courseCode = _sanitizeFileSegment(widget.course.code);
+      final groupCode = _sanitizeFileSegment(widget.course.groupCode);
+      final prefix = 'Asistencia_Uniguajira_${courseCode}_$groupCode';
+
+      File? latestFile;
+      DateTime? latestModified;
+
+      final entities = directory.listSync(followLinks: false);
+      for (final entity in entities) {
+        if (entity is File && entity.path.endsWith('.xlsx')) {
+          final name = p.basename(entity.path);
+          if (name.startsWith(prefix)) {
+            final length = entity.lengthSync();
+            if (length > 0) {
+              final mod = entity.lastModifiedSync();
+              if (latestModified == null || mod.isAfter(latestModified)) {
+                latestModified = mod;
+                latestFile = entity;
+              }
+            }
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _latestExportedFilePath = latestFile?.path;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error al verificar último archivo Excel exportado: $e');
+      if (mounted) {
+        setState(() => _latestExportedFilePath = null);
+      }
+    }
+  }
+
+  static String _sanitizeFileSegment(String value) {
+    final sanitized = value
+        .trim()
+        .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_')
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[. ]+$'), '');
+    return sanitized.isEmpty ? 'SIN_DATO' : sanitized;
+  }
+
+  Future<void> _exportOfficialExcelWorkbook() async {
+    if (_isExporting) return;
+
+    setState(() => _isExporting = true);
+
+    try {
+      final targetDirectory = await _resolveExportDirectory();
+      final filePath = await _excelService.exportWorkbookToFile(
+        courseId: widget.course.id,
+        directoryPath: targetDirectory,
+      );
+
+      final file = File(filePath);
+      final fileSizeBytes = await file.exists() ? await file.length() : 0;
+      final summary = _summary ?? await _excelService.buildCourseSummary(widget.course.id);
+      final hmacSha256 = summary.reportHmacSha256;
+
+      if (!mounted) return;
+      setState(() {
+        _isExporting = false;
+        _latestExportedFilePath = filePath;
+      });
+
+      await _showExportSuccessDialog(
+        filePath: filePath,
+        fileSizeBytes: fileSizeBytes,
+        hmacSha256: hmacSha256,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final colors = AppColors.of(context);
+      setState(() => _isExporting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al exportar libro Excel: $e'),
+          backgroundColor: colors.statusPerdida,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showExportSuccessDialog({
+    required String filePath,
+    required int fileSizeBytes,
+    required String hmacSha256,
+  }) async {
+    await CourseReportsScreen.showExportSuccessDialog(
+      context: context,
+      filePath: filePath,
+      fileSizeBytes: fileSizeBytes,
+      hmacSha256: hmacSha256,
+      onShare: () => _shareExportedFile(filePath),
+    );
+  }
+
+  Future<void> _shareExportedFile(String filePath) async {
+    if (_isSharing) return;
+
+    setState(() => _isSharing = true);
+    final colors = AppColors.of(context);
+
+    try {
+      final outcome = await _reportShareService.shareReport(
+        filePath: filePath,
+        courseName: widget.course.name,
+      );
+
+      if (!mounted) return;
+
+      if (outcome.isError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              outcome.errorMessage ??
+                  'Ocurrió un error al intentar compartir el reporte.',
+            ),
+            backgroundColor: colors.statusPerdida,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      } else if (outcome.isSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Reporte compartido exitosamente.'),
+            backgroundColor: colors.statusNormal,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error inesperado al compartir: $e'),
+          backgroundColor: colors.statusPerdida,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSharing = false);
+        await _checkLatestExportedFile();
+      }
+    }
   }
 
   Future<void> _handleInstitutionalSync() async {
@@ -1920,6 +2081,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     final colors = AppColors.of(context);
     final spacing = AppSpacing.of(context);
     final radii = AppRadii.of(context);
+    final latestPath = _latestExportedFilePath;
 
     return Container(
       padding: spacing.only(
@@ -1934,33 +2096,64 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: _isExporting ? null : _exportOfficialExcelWorkbook,
-            icon: _isExporting
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: colors.onStatusNormal,
-                    ),
-                  )
-                : const Icon(Icons.table_view_rounded),
-            label: Text(
-              _isExporting
-                  ? 'Generando Libro Oficial (.xlsx)...'
-                  : 'Exportar Excel Oficial (.xlsx — 4 Hojas)',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            if (latestPath != null) ...<Widget>[
+              OutlinedButton.icon(
+                onPressed: (_isExporting || _isSharing)
+                    ? null
+                    : () => _shareExportedFile(latestPath),
+                icon: _isSharing
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colors.primary,
+                        ),
+                      )
+                    : const Icon(Icons.share_rounded, size: 18),
+                label: const Text(
+                  'Compartir último Excel',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colors.primary,
+                  side: BorderSide(color: colors.primary),
+                  padding: spacing.symmetric(vertical: spacing.sm),
+                  shape: radii.buttonShape(),
+                ),
+              ),
+              SizedBox(height: spacing.xs),
+            ],
+            FilledButton.icon(
+              onPressed: _isExporting ? null : _exportOfficialExcelWorkbook,
+              icon: _isExporting
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colors.onStatusNormal,
+                      ),
+                    )
+                  : const Icon(Icons.table_view_rounded),
+              label: Text(
+                _isExporting
+                    ? 'Generando Libro Oficial (.xlsx)...'
+                    : 'Exportar Excel Oficial (.xlsx — 4 Hojas)',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.statusNormal,
+                foregroundColor: colors.onStatusNormal,
+                padding: spacing.symmetric(vertical: spacing.sm),
+                shape: radii.buttonShape(),
+              ),
             ),
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.statusNormal,
-              foregroundColor: colors.onStatusNormal,
-              padding: spacing.symmetric(vertical: spacing.sm),
-              shape: radii.buttonShape(),
-            ),
-          ),
+          ],
         ),
       ),
     );
