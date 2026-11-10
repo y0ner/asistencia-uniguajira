@@ -21,9 +21,10 @@ subprojects {
 
 subprojects {
     if (project.name == "flutter_blue_plus") {
-        tasks.configureEach {
-            if (name.contains("AarMetadata")) {
-                enabled = false
+        afterEvaluate {
+            val android = project.extensions.findByName("android")
+            if (android is com.android.build.gradle.BaseExtension) {
+                android.compileSdkVersion(36)
             }
         }
     }
