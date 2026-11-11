@@ -330,9 +330,7 @@ class ExcelReportService {
     final directory = Directory(normalizedDirectory);
     await directory.create(recursive: true);
 
-    final courseCode = _sanitizeFileSegment(summary.course.code);
-    final groupCode = _sanitizeFileSegment(summary.course.groupCode);
-    final fileName = 'Asistencia_Uniguajira_${courseCode}_$groupCode.xlsx';
+    final fileName = exportFileNameFor(summary.course);
     final file = File(p.join(directory.absolute.path, fileName));
     await file.writeAsBytes(bytes, flush: true);
     return file.absolute.path;
@@ -670,6 +668,15 @@ class ExcelReportService {
       return BoolCellValue(value);
     }
     return TextCellValue(value?.toString() ?? '');
+  }
+
+  /// Nombre del archivo Excel que [exportWorkbookToFile] genera para [course].
+  ///
+  /// Es fijo por curso y grupo: cada exportación sobrescribe la anterior.
+  static String exportFileNameFor(CourseModel course) {
+    final courseCode = _sanitizeFileSegment(course.code);
+    final groupCode = _sanitizeFileSegment(course.groupCode);
+    return 'Asistencia_Uniguajira_${courseCode}_$groupCode.xlsx';
   }
 
   static String _sanitizeFileSegment(String value) {

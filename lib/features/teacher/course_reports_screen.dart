@@ -358,42 +358,12 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
   Future<void> _checkLatestExportedFile() async {
     try {
       final directoryPath = await _resolveExportDirectory();
-      final directory = Directory(directoryPath);
-      if (!await directory.exists()) {
-        if (mounted) {
-          setState(() => _latestExportedFilePath = null);
-        }
-        return;
-      }
-
-      final courseCode = _sanitizeFileSegment(widget.course.code);
-      final groupCode = _sanitizeFileSegment(widget.course.groupCode);
-      final prefix = 'Asistencia_Uniguajira_${courseCode}_$groupCode';
-
-      File? latestFile;
-      DateTime? latestModified;
-
-      final entities = directory.listSync(followLinks: false);
-      for (final entity in entities) {
-        if (entity is File && entity.path.endsWith('.xlsx')) {
-          final name = p.basename(entity.path);
-          if (name.startsWith(prefix)) {
-            final length = entity.lengthSync();
-            if (length > 0) {
-              final mod = entity.lastModifiedSync();
-              if (latestModified == null || mod.isAfter(latestModified)) {
-                latestModified = mod;
-                latestFile = entity;
-              }
-            }
-          }
-        }
-      }
-
+      final file = File(
+        p.join(directoryPath, ExcelReportService.exportFileNameFor(widget.course)),
+      );
+      final exists = await file.exists() && await file.length() > 0;
       if (mounted) {
-        setState(() {
-          _latestExportedFilePath = latestFile?.path;
-        });
+        setState(() => _latestExportedFilePath = exists ? file.path : null);
       }
     } catch (e) {
       debugPrint('Error al verificar último archivo Excel exportado: $e');
@@ -401,15 +371,6 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
         setState(() => _latestExportedFilePath = null);
       }
     }
-  }
-
-  static String _sanitizeFileSegment(String value) {
-    final sanitized = value
-        .trim()
-        .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_')
-        .replaceAll(RegExp(r'\s+'), '_')
-        .replaceAll(RegExp(r'[. ]+$'), '');
-    return sanitized.isEmpty ? 'SIN_DATO' : sanitized;
   }
 
   Future<void> _exportOfficialExcelWorkbook() async {

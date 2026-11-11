@@ -786,6 +786,26 @@ void main() {
       },
     );
 
+    test('exportFileNameFor limpia caracteres no válidos en nombres de archivo', () {
+      final raro = CourseModel(
+        id: 'x',
+        code: 'SIST/401 ',
+        name: 'Curso',
+        groupCode: '  ',
+        semester: '2026-2',
+        courseSecret: 'secreto',
+        createdAt: '2026-11-10T00:00:00Z',
+      );
+      expect(
+        ExcelReportService.exportFileNameFor(raro),
+        'Asistencia_Uniguajira_SIST_401_SIN_DATO.xlsx',
+      );
+      expect(
+        ExcelReportService.exportFileNameFor(course),
+        'Asistencia_Uniguajira_SIST-401_01.xlsx',
+      );
+    });
+
     test('exportWorkbookToFile guarda archivo físico en disco y valida su estructura', () async {
       final tempDir = Directory.systemTemp.createTempSync('uniguajira_excel_');
       try {
