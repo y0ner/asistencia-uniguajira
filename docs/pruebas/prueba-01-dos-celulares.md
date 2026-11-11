@@ -10,8 +10,9 @@
 1. Compilar desde `dev`:
 
    ```bash
-   ./run.sh apk-docente      # build/app/outputs/flutter-apk/app-docente-debug.apk
-   ./run.sh apk-estudiante   # build/app/outputs/flutter-apk/app-estudiante-debug.apk
+   flutter build apk --debug --flavor docente -t lib/main_docente.dart
+   flutter build apk --debug --flavor estudiante -t lib/main_estudiante.dart
+   # → build/app/outputs/flutter-apk/app-docente-debug.apk y app-estudiante-debug.apk
    ```
 
 2. En cada celular, activar **Opciones de desarrollador → Depuración USB**, conectarlo y aceptar la huella del PC.
