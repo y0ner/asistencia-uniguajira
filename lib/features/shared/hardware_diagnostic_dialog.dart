@@ -3,36 +3,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../core/platform/android_sdk.dart';
 import '../../theme/theme.dart';
 
-/// Determina de forma asíncrona si el dispositivo Android ejecuta API 31 (Android 12) o superior.
+/// Indica si el dispositivo Android ejecuta API 31 (Android 12) o superior.
+///
+/// Desde Android 12 los permisos BLE no exigen ubicación.
 Future<bool> isAndroid12OrHigher() async {
-  if (!Platform.isAndroid) return false;
-  try {
-    final result = await Process.run('getprop', <String>['ro.build.version.sdk']);
-    if (result.exitCode == 0) {
-      final sdk = int.tryParse(result.stdout.toString().trim());
-      if (sdk != null) {
-        return sdk >= 31;
-      }
-    }
-  } catch (e) {
-    debugPrint('Diagnóstico BLE: No se pudo consultar ro.build.version.sdk vía getprop: $e');
-  }
-
-  try {
-    final versionStr = Platform.operatingSystemVersion.toLowerCase();
-    final match = RegExp(r'android\s*([0-9]+)').firstMatch(versionStr);
-    if (match != null) {
-      final major = int.tryParse(match.group(1) ?? '');
-      if (major != null) return major >= 12;
-    }
-  } catch (e) {
-    debugPrint('Diagnóstico BLE: No se pudo determinar versión desde operatingSystemVersion: $e');
-  }
-
-  // En Android moderno, la proximidad BLE no requiere ubicación por diseño.
-  return true;
+  final sdk = await androidSdkInt();
+  return sdk != null && sdk >= 31;
 }
 
 /// Despliega el modal de diagnóstico de hardware en Android o Linux Desktop.
