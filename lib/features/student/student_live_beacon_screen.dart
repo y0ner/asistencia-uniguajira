@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/crypto/ble_packet_codec.dart';
@@ -10,6 +11,7 @@ import '../../core/models/student_enrollment_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/attendance_session_controller.dart';
 import '../../data/services/ble_attendance_service.dart';
+import '../../data/services/ble_permission_service.dart';
 import '../../theme/theme.dart';
 
 /// Fases del flujo de emisión BLE y recepción de eco en el estudiante.
@@ -38,6 +40,7 @@ class StudentLiveBeaconScreen extends StatefulWidget {
     required this.enrollment,
     this.bleService,
     this.sessionController,
+    this.permissionService,
     this.database,
   });
 
@@ -49,6 +52,9 @@ class StudentLiveBeaconScreen extends StatefulWidget {
 
   /// Controlador de sesión inyectable para verificar el eco docente.
   final AttendanceSessionController? sessionController;
+
+  /// Servicio de permisos BLE inyectable para pruebas.
+  final BlePermissionService? permissionService;
 
   /// Base de datos local inyectable.
   final AppDatabase? database;
@@ -62,6 +68,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
     with SingleTickerProviderStateMixin {
   late final BleAttendanceService _bleService;
   late final bool _ownsBleService;
+  late final BlePermissionService _permissionService;
   late final AttendanceSessionController _sessionController;
   late final bool _ownsSessionController;
 
@@ -72,6 +79,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
 
   int? _sessionPin;
   StreamSubscription<BlePacketEvent>? _bleSubscription;
+  StreamSubscription<BleRuntimeIssue>? _bleIssuesSubscription;
   Timer? _tickerTimer;
   DateTime _now = DateTime.now();
   int _currentTick = 0;
@@ -82,6 +90,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
   DateTime? _confirmedAt;
 
   String? _bleWarning;
+  BlePermissionResult? _permissionResult;
   bool _isProcessingPacket = false;
 
   late final AnimationController _pulseController;
@@ -90,6 +99,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
   @override
   void initState() {
     super.initState();
+    unawaited(WakelockPlus.enable());
     _bleService = widget.bleService ?? BleAttendanceService();
     _ownsBleService = widget.bleService == null;
 
@@ -98,6 +108,17 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
         widget.sessionController ??
         AttendanceSessionController(database: db, bleService: _bleService);
     _ownsSessionController = widget.sessionController == null;
+
+    _permissionService =
+        widget.permissionService ?? BlePermissionService();
+
+    _bleIssuesSubscription = _bleService.issues.listen((BleRuntimeIssue issue) {
+      if (mounted) {
+        setState(() {
+          _bleWarning = issue.message;
+        });
+      }
+    });
 
     _pinController = TextEditingController();
     _pinController.addListener(() {
@@ -116,9 +137,11 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
 
   @override
   void dispose() {
+    unawaited(WakelockPlus.disable());
     _pulseController.dispose();
     _tickerTimer?.cancel();
     _bleSubscription?.cancel();
+    _bleIssuesSubscription?.cancel();
 
     if (_phase == StudentBeaconPhase.broadcasting) {
       unawaited(_bleService.stopAdvertising());
@@ -141,6 +164,19 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
   // ---------------------------------------------------------------------------
 
   Future<void> _startBroadcasting(int pin) async {
+    // Diagnóstico previo obligatorio de permisos y hardware BLE
+    final permResult = await _permissionService.ensureReady();
+    if (!permResult.isReady) {
+      if (mounted) {
+        setState(() {
+          _permissionResult = permResult;
+          _bleWarning = permResult.failureMessage;
+        });
+      }
+      return;
+    }
+
+    _permissionResult = null;
     _sessionPin = pin;
     _now = DateTime.now();
     _currentTick = BlePacketCodec.computeTimeTick(_now);
@@ -177,9 +213,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _bleWarning =
-            'Emisión por hardware no disponible en este entorno ($e). '
-            'Usa el botón de simulación para verificar el flujo.';
+        _bleWarning = 'Fallo al emitir anuncio BLE: $e';
       });
     }
 
@@ -188,9 +222,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _bleWarning ??=
-            'Escaneo BLE no disponible en este dispositivo ($e). '
-            'Usa el botón de simulación para verificar el flujo.';
+        _bleWarning ??= 'Fallo al iniciar escaneo BLE: $e';
       });
     }
 
@@ -231,8 +263,12 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
   Future<void> _updateAdvertisingPacket(Uint8List packet) async {
     try {
       await _bleService.startAdvertisingPacket(packet);
-    } catch (_) {
-      // Ignorar fallo de actualización en dispositivos sin emisor nativo.
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _bleWarning = 'Error al actualizar emisión BLE: $e';
+        });
+      }
     }
   }
 
@@ -254,14 +290,15 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
       if (outcome.isConfirmed) {
         await _onConfirmed(outcome);
       }
-    } catch (_) {
-      // Paquetes ajenos al protocolo o corruptos se descartan sin interrumpir.
+    } catch (e) {
+      debugPrint('Paquete BLE descartado durante verificación: $e');
     } finally {
       _isProcessingPacket = false;
     }
   }
 
   Future<void> _onConfirmed(StudentConfirmationOutcome outcome) async {
+    unawaited(WakelockPlus.disable());
     _tickerTimer?.cancel();
     _tickerTimer = null;
     await _bleSubscription?.cancel();
@@ -269,10 +306,14 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
 
     try {
       await _bleService.stopAdvertising();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Aviso al detener anuncio BLE tras confirmación: $e');
+    }
     try {
       await _bleService.stopScan();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Aviso al detener escaneo BLE tras confirmación: $e');
+    }
 
     await HapticFeedback.heavyImpact();
 
@@ -292,10 +333,14 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
 
     try {
       await _bleService.stopAdvertising();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Aviso al detener anuncio BLE en cancelación: $e');
+    }
     try {
       await _bleService.stopScan();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Aviso al detener escaneo BLE en cancelación: $e');
+    }
 
     if (!mounted) return;
     setState(() {
@@ -303,28 +348,6 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
       _sessionPin = null;
       _bleWarning = null;
     });
-  }
-
-  Future<void> _simulateTeacherEcho() async {
-    if (_sessionPin == null) return;
-
-    // Construye un mapa de bits de 8 bytes con el bit del estudiante en 1.
-    final bitmap8 = BlePacketCodec.setStudentBit(
-      BlePacketCodec.createEmptyBitmap8(),
-      widget.enrollment.bitIndex,
-    );
-
-    // Construye el paquete de eco firmado con el sharedSecret del curso.
-    final simulatedEcho = BlePacketCodec.buildTeacherEchoBytes(
-      courseId: widget.enrollment.courseId,
-      sessionId: 'simulated_session_${widget.enrollment.courseId}',
-      bitmap8: bitmap8,
-      sharedSecretHex: widget.enrollment.sharedSecret,
-    );
-
-    // Inyecta en el servicio y procesa con el verificador real.
-    _bleService.injectSimulatedPacket(packet16: simulatedEcho, rssi: -60);
-    await _handleIncomingPacket(simulatedEcho, -60);
   }
 
   // ---------------------------------------------------------------------------
@@ -508,6 +531,82 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                 ),
               ),
               SizedBox(height: spacing.xl),
+
+              if (_permissionResult != null && !_permissionResult!.isReady) ...<Widget>[
+                Container(
+                  padding: spacing.insetsSm,
+                  decoration: BoxDecoration(
+                    color: colors.statusAlertaContainer,
+                    borderRadius: radii.borderMd,
+                    border: Border.all(
+                      color: colors.statusAlerta.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Column(
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Icon(
+                            _permissionResult!.onlyBluetoothOff
+                                ? Icons.bluetooth_disabled
+                                : Icons.security_update_warning_outlined,
+                            size: 22,
+                            color: colors.statusAlerta,
+                          ),
+                          SizedBox(width: spacing.xs),
+                          Expanded(
+                            child: Text(
+                              _permissionResult!.failureMessage ??
+                                  'Faltan permisos o encender Bluetooth.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: colors.onStatusAlertaContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: spacing.xs),
+                      if (_permissionResult!.requiresAppSettings)
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.tonal(
+                            style: FilledButton.styleFrom(
+                              shape: radii.buttonShape(),
+                            ),
+                            onPressed: () =>
+                                _permissionService.openAppSettings(),
+                            child: const Text('Abrir Ajustes'),
+                          ),
+                        )
+                      else if (_permissionResult!.onlyBluetoothOff)
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.tonal(
+                            style: FilledButton.styleFrom(
+                              shape: radii.buttonShape(),
+                            ),
+                            onPressed: () async {
+                              await _permissionService.turnOnBluetooth();
+                              if (parsed != null && isValidPin) {
+                                await _startBroadcasting(parsed);
+                              } else {
+                                final res =
+                                    await _permissionService.ensureReady();
+                                if (mounted) {
+                                  setState(() => _permissionResult = res);
+                                }
+                              }
+                            },
+                            child: const Text('Encender Bluetooth'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: spacing.md),
+              ],
 
               // Botón "Iniciar Emisión BLE"
               SizedBox(
@@ -895,7 +994,9 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                   decoration: BoxDecoration(
                     color: colors.statusAlertaContainer,
                     borderRadius: radii.borderMd,
-                    border: Border.all(color: colors.statusAlerta.withValues(alpha: 0.4)),
+                    border: Border.all(
+                      color: colors.statusAlerta.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -920,21 +1021,6 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen>
                 ),
                 SizedBox(height: spacing.md),
               ],
-
-              // Botón discreto de simulación para pruebas de escritorio / QA
-              OutlinedButton.icon(
-                onPressed: _simulateTeacherEcho,
-                icon: const Icon(Icons.science_outlined, size: 20),
-                label: const Text('Simular Eco Docente (Demo/Test)'),
-                style: OutlinedButton.styleFrom(
-                  padding: spacing.insetsVSm,
-                  shape: radii.buttonShape(),
-                  side: BorderSide(
-                    color: colors.outline.withValues(alpha: 0.5),
-                  ),
-                ),
-              ),
-              SizedBox(height: spacing.sm),
 
               // Botón para cancelar emisión y volver al paso 1
               TextButton.icon(

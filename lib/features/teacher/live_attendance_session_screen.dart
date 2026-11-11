@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/crypto/ble_packet_codec.dart';
@@ -10,12 +11,13 @@ import '../../core/models/student_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/attendance_session_controller.dart';
 import '../../data/services/ble_attendance_service.dart';
+import '../../data/services/ble_permission_service.dart';
 import '../../theme/theme.dart';
 import 'signed_acta_dialog.dart';
 
 /// Pantalla de Sesión de Asistencia Docente en Vivo:
 /// - Cabecera con PIN Verbal de 2 dígitos y visualizador en tiempo real del Mapa de Bits (64 bits / 8 bytes).
-/// - Pestaña 1: Radar BLE en vivo con confirmación criptográfica y simulador de prueba.
+/// - Pestaña 1: Radar BLE en vivo con confirmación criptográfica en tiempo real.
 /// - Pestaña 2: Lista invertida a 1 toque con priorización de pendientes y buscador rápido.
 /// - Cierre y firma criptográfica de acta con HMAC-SHA256.
 class LiveAttendanceSessionScreen extends StatefulWidget {
@@ -25,6 +27,7 @@ class LiveAttendanceSessionScreen extends StatefulWidget {
     this.database,
     this.controller,
     this.bleService,
+    this.permissionService,
     this.customPin,
   });
 
@@ -40,6 +43,9 @@ class LiveAttendanceSessionScreen extends StatefulWidget {
   /// Servicio BLE inyectable para pruebas.
   final BleAttendanceService? bleService;
 
+  /// Servicio de permisos BLE inyectable para pruebas.
+  final BlePermissionService? permissionService;
+
   /// PIN verbal personalizado de prueba (10..99).
   final int? customPin;
 
@@ -53,6 +59,7 @@ class _LiveAttendanceSessionScreenState
     with SingleTickerProviderStateMixin {
   late final AppDatabase _database;
   late final BleAttendanceService _bleService;
+  late final BlePermissionService _permissionService;
   late final AttendanceSessionController _controller;
   late final bool _ownsController;
   late final TabController _tabController;
@@ -60,12 +67,14 @@ class _LiveAttendanceSessionScreenState
   bool _isStarting = true;
   bool _isClosing = false;
   String? _initError;
+  BlePermissionResult? _permissionResult;
 
   List<StudentModel> _students = <StudentModel>[];
   Map<String, AttendanceRecordModel> _recordsByStudentId =
       <String, AttendanceRecordModel>{};
 
   StreamSubscription<BlePacketEvent>? _bleEventsSub;
+  StreamSubscription<BleRuntimeIssue>? _bleIssuesSub;
   Timer? _periodicRefreshTimer;
 
   String _searchQuery = '';
@@ -74,9 +83,12 @@ class _LiveAttendanceSessionScreenState
   @override
   void initState() {
     super.initState();
+    unawaited(WakelockPlus.enable());
     _tabController = TabController(length: 2, vsync: this);
     _database = widget.database ?? AppDatabase.instance;
     _bleService = widget.bleService ?? BleAttendanceService();
+    _permissionService =
+        widget.permissionService ?? BlePermissionService();
     if (widget.controller != null) {
       _controller = widget.controller!;
       _ownsController = false;
@@ -93,10 +105,12 @@ class _LiveAttendanceSessionScreenState
 
   @override
   void dispose() {
+    unawaited(WakelockPlus.disable());
     _tabController.dispose();
     _searchController.dispose();
     _periodicRefreshTimer?.cancel();
     _bleEventsSub?.cancel();
+    _bleIssuesSub?.cancel();
     if (_ownsController) {
       _controller.dispose();
     }
@@ -107,9 +121,22 @@ class _LiveAttendanceSessionScreenState
     setState(() {
       _isStarting = true;
       _initError = null;
+      _permissionResult = null;
     });
 
     try {
+      // Diagnóstico y solicitud previa de permisos / Bluetooth
+      final permResult = await _permissionService.ensureReady();
+      if (!permResult.isReady) {
+        if (mounted) {
+          setState(() {
+            _permissionResult = permResult;
+            _isStarting = false;
+          });
+        }
+        return;
+      }
+
       final studentsList =
           await _database.getStudentsByCourse(widget.course.id);
       studentsList.sort(
@@ -142,6 +169,13 @@ class _LiveAttendanceSessionScreenState
             _reloadRecords();
           }
         });
+      });
+
+      // Escuchamos incidencias BLE en tiempo real para refrescar advertencias
+      _bleIssuesSub = _bleService.issues.listen((_) {
+        if (mounted) {
+          setState(() {});
+        }
       });
 
       // Polling ligero cada 1.5s para mantener sincronizado el Bitmap y la base de datos
@@ -185,8 +219,9 @@ class _LiveAttendanceSessionScreenState
           };
         });
       }
-    } catch (_) {
-      // Ignoramos errores transitorios de lectura mientras se ejecutan transacciones
+    } catch (e) {
+      // Registramos aviso en lecturas concurrentes transitorias
+      debugPrint('Aviso transitorio al recargar registros de asistencia: $e');
     }
   }
 
@@ -254,231 +289,6 @@ class _LiveAttendanceSessionScreenState
         observation: obs.isEmpty ? null : obs,
       );
     }
-  }
-
-  Future<void> _simulateBleArrival(StudentModel student) async {
-    final state = _controller.state;
-    if (state == null || !state.isOpen) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No hay una sesión activa para simular.'),
-        ),
-      );
-      return;
-    }
-
-    try {
-      final now = DateTime.now();
-      final timeTick = BlePacketCodec.computeTimeTick(now);
-      final packet16 = BlePacketCodec.buildStudentBeaconBytes(
-        courseId: widget.course.id,
-        bitIndex: student.bitIndex,
-        sessionPin: state.pin,
-        secretHex: student.personalSecret,
-        timeTick: timeTick,
-      );
-
-      final outcome = await _controller.processIncomingStudentPacket(
-        packet16: packet16,
-        rssi: -62,
-        nowOverride: now,
-      );
-
-      if (!mounted) return;
-
-      if (outcome.isAccepted) {
-        await _reloadRecords();
-        if (!mounted) return;
-        final colors = AppColors.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '¡Llegada BLE confirmada! ${student.fullName} (Bit #${student.bitIndex.toString().padLeft(2, '0')}) '
-              'Token: ${outcome.verifyCode}',
-            ),
-            backgroundColor: colors.statusNormal,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      } else {
-        final colors = AppColors.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Rechazo criptográfico: ${outcome.failureReason ?? "Firma no válida"}',
-            ),
-            backgroundColor: colors.statusPerdida,
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      final colors = AppColors.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al simular llegada BLE: $e'),
-          backgroundColor: colors.statusPerdida,
-        ),
-      );
-    }
-  }
-
-  void _openSimulationPicker() {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-
-    final pendingStudents = _students
-        .where((StudentModel s) => !_recordsByStudentId.containsKey(s.id))
-        .toList(growable: false);
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: radii.modalShape(),
-      builder: (BuildContext ctx) {
-        final theme = Theme.of(ctx);
-
-        if (pendingStudents.isEmpty) {
-          return Padding(
-            padding: spacing.insetsLg,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Icon(
-                  Icons.check_circle_outline,
-                  color: colors.statusNormal,
-                  size: 48,
-                ),
-                SizedBox(height: spacing.sm),
-                Text(
-                  'Todos los estudiantes están presentes',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: spacing.xs),
-                const Text(
-                  'No hay estudiantes pendientes por detectar en esta sesión.',
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: spacing.md),
-                FilledButton(
-                  style: FilledButton.styleFrom(shape: radii.buttonShape()),
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Cerrar'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return SafeArea(
-          child: Padding(
-            padding: spacing.symmetric(horizontal: spacing.md, vertical: spacing.lg),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Icon(Icons.science, color: colors.primary),
-                    SizedBox(width: spacing.xs),
-                    Text(
-                      'Simulador de Anuncio BLE',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                  ],
-                ),
-                SizedBox(height: spacing.xxs),
-                Text(
-                  'Selecciona un estudiante para inyectar su paquete de 16 bytes firmado con su clave HMAC real (RSSI: -62 dBm).',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceMuted,
-                  ),
-                ),
-                SizedBox(height: spacing.sm),
-                // Botón rápido para simular el primer pendiente
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      _simulateBleArrival(pendingStudents.first);
-                    },
-                    icon: const Icon(Icons.bolt),
-                    label: Text(
-                      'Simular Primero: ${pendingStudents.first.fullName}',
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colors.statusNormal,
-                      foregroundColor: colors.onStatusNormal,
-                      shape: radii.buttonShape(),
-                    ),
-                  ),
-                ),
-                Divider(height: spacing.lg),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 320),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: pendingStudents.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
-                    itemBuilder: (BuildContext _, int index) {
-                      final student = pendingStudents[index];
-                      final bitPadded =
-                          student.bitIndex.toString().padLeft(2, '0');
-                      return ListTile(
-                        dense: true,
-                        leading: CircleAvatar(
-                          radius: 14,
-                          backgroundColor: colors.primaryContainer,
-                          child: Text(
-                            bitPadded,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: colors.onPrimaryContainer,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          student.fullName,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text('Cód: ${student.studentCode}'),
-                        trailing: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.of(ctx).pop();
-                            _simulateBleArrival(student);
-                          },
-                          icon: const Icon(Icons.sensors, size: 16),
-                          label: const Text('Simular'),
-                          style: ElevatedButton.styleFrom(
-                            shape: radii.buttonShape(),
-                            padding: spacing.symmetric(
-                              horizontal: spacing.xs,
-                              vertical: spacing.xxs,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   Future<void> _handleCloseAndSignSession() async {
@@ -556,6 +366,7 @@ class _LiveAttendanceSessionScreenState
 
     try {
       final signedActa = await _controller.closeAndSignSession();
+      unawaited(WakelockPlus.disable());
       if (!mounted) return;
 
       setState(() => _isClosing = false);
@@ -609,6 +420,89 @@ class _LiveAttendanceSessionScreenState
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ],
+          ),
+        ),
+      );
+    }
+
+    if (_permissionResult != null && !_permissionResult!.isReady) {
+      final perm = _permissionResult!;
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.course.name),
+          backgroundColor: colors.primary,
+          foregroundColor: colors.onPrimary,
+        ),
+        body: Center(
+          child: Padding(
+            padding: spacing.insetsLg,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(
+                  perm.onlyBluetoothOff
+                      ? Icons.bluetooth_disabled
+                      : Icons.security_update_warning_outlined,
+                  size: 54,
+                  color: colors.statusAlerta,
+                ),
+                SizedBox(height: spacing.md),
+                Text(
+                  perm.onlyBluetoothOff
+                      ? 'Bluetooth Apagado'
+                      : 'Permisos Requeridos',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: spacing.xs),
+                Text(
+                  perm.failureMessage ??
+                      'Se requiere habilitar el Bluetooth para iniciar la sesión.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceMuted,
+                  ),
+                ),
+                SizedBox(height: spacing.lg),
+                if (perm.requiresAppSettings) ...<Widget>[
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      shape: radii.buttonShape(),
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                    ),
+                    onPressed: () async {
+                      await _permissionService.openAppSettings();
+                    },
+                    icon: const Icon(Icons.settings),
+                    label: const Text('Abrir Ajustes'),
+                  ),
+                  SizedBox(height: spacing.sm),
+                ] else if (perm.onlyBluetoothOff) ...<Widget>[
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      shape: radii.buttonShape(),
+                      backgroundColor: colors.statusNormal,
+                      foregroundColor: colors.onStatusNormal,
+                    ),
+                    onPressed: () async {
+                      await _permissionService.turnOnBluetooth();
+                      await _initializeSession();
+                    },
+                    icon: const Icon(Icons.bluetooth),
+                    label: const Text('Encender Bluetooth'),
+                  ),
+                  SizedBox(height: spacing.sm),
+                ],
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(shape: radii.buttonShape()),
+                  onPressed: _initializeSession,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reintentar Verificación'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -1150,21 +1044,6 @@ class _LiveAttendanceSessionScreenState
                   ),
                 ],
               ),
-              SizedBox(height: spacing.sm),
-              // Botón para Simular Llegada BLE
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _openSimulationPicker,
-                  icon: const Icon(Icons.bolt),
-                  label: const Text('Simular Llegada BLE (Demo/Test)'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colors.statusNormal,
-                    foregroundColor: colors.onStatusNormal,
-                    shape: radii.buttonShape(),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -1230,12 +1109,6 @@ class _LiveAttendanceSessionScreenState
             style: theme.textTheme.bodySmall?.copyWith(
               color: colors.onSurfaceMuted,
             ),
-          ),
-          SizedBox(height: spacing.sm),
-          TextButton.icon(
-            onPressed: _openSimulationPicker,
-            icon: const Icon(Icons.science_outlined),
-            label: const Text('Probar con simulador'),
           ),
         ],
       ),
