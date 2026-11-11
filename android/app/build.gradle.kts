@@ -28,6 +28,25 @@ android {
         versionName = flutter.versionName
     }
 
+    buildFeatures {
+        // Necesario en AGP 8+ para usar resValue("string", "app_name", …) en los flavors.
+        resValues = true
+    }
+
+    flavorDimensions += "rol"
+    productFlavors {
+        create("docente") {
+            dimension = "rol"
+            applicationIdSuffix = ".docente"
+            resValue("string", "app_name", "Asistencia Docente")
+        }
+        create("estudiante") {
+            dimension = "rol"
+            applicationIdSuffix = ".estudiante"
+            resValue("string", "app_name", "Asistencia Estudiante")
+        }
+    }
+
     buildTypes {
         release {
             // Signing with the debug keys for now, so `flutter run --release` works.

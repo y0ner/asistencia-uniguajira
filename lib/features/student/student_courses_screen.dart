@@ -10,6 +10,7 @@ import '../../core/models/student_enrollment_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/student_enrollment_service.dart';
 import '../../theme/theme.dart';
+import '../shared/hardware_diagnostic_dialog.dart';
 import 'student_live_beacon_screen.dart';
 import 'student_qr_enrollment_screen.dart';
 
@@ -177,6 +178,11 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
       appBar: AppBar(
         title: const Text('Mis Cursos Enrolados'),
         actions: <Widget>[
+          IconButton(
+            tooltip: 'Diagnóstico de Permisos Hardware',
+            icon: const Icon(Icons.bluetooth_searching),
+            onPressed: () => showHardwareDiagnosticDialog(context),
+          ),
           IconButton(
             icon: const Icon(Icons.qr_code_scanner),
             tooltip: 'Escanear QR de enrolamiento',

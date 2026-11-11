@@ -7,6 +7,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/course_model.dart';
 import '../../data/local/app_database.dart';
 import '../../theme/theme.dart';
+import '../shared/hardware_diagnostic_dialog.dart';
 import 'course_detail_screen.dart';
 
 /// Panel principal de gestión de cursos para el docente:
@@ -322,6 +323,13 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gestión de Cursos'),
+        actions: <Widget>[
+          IconButton(
+            tooltip: 'Diagnóstico de Permisos Hardware',
+            icon: const Icon(Icons.bluetooth_searching),
+            onPressed: () => showHardwareDiagnosticDialog(context),
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
