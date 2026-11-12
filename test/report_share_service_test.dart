@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:asistencia_uniguajira/data/services/report_share_service.dart';
 import 'package:asistencia_uniguajira/features/teacher/course_reports_screen.dart';
-import 'package:asistencia_uniguajira/theme/theme.dart';
+import 'package:asistencia_uniguajira/ui/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_plus/share_plus.dart';
@@ -204,7 +204,7 @@ void main() {
 
   group('CourseReportsScreen Diálogo de éxito de exportación', () {
     testWidgets(
-      'muestra botón Compartir y botón Cerrar, además de tamaño y huella HMAC',
+      'muestra nombre, tamaño y los botones Compartir y Cerrar, sin huella a la vista',
       (WidgetTester tester) async {
         const testFilePath = '/storage/emulated/0/Download/Asistencia_MAT101_01.xlsx';
         const testFileSize = 24576;
@@ -214,7 +214,7 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
-            theme: AppTheme.buildLightTheme(),
+            theme: UiTheme.light(),
             home: Scaffold(
               body: Builder(
                 builder: (BuildContext context) {
@@ -243,10 +243,10 @@ void main() {
         await tester.pumpAndSettle();
 
         // Verificar título e información clave
-        expect(find.text('Excel Oficial Generado'), findsOneWidget);
-        expect(find.textContaining('24576 bytes'), findsOneWidget);
-        expect(find.text('Asistencia_MAT101_01.xlsx'), findsOneWidget); // nombre (la ruta completa también lo contiene)
-        expect(find.text(testHmac), findsOneWidget);
+        expect(find.text('Excel listo'), findsOneWidget);
+        expect(find.text('24.0 KB'), findsOneWidget);
+        expect(find.text('Asistencia_MAT101_01.xlsx'), findsOneWidget);
+        expect(find.text(testHmac), findsNothing);
 
         // Verificar acciones: Cerrar y Compartir
         final cerrarButton = find.widgetWithText(TextButton, 'Cerrar');
@@ -260,7 +260,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(shareInvoked, isTrue);
-        expect(find.text('Excel Oficial Generado'), findsNothing);
+        expect(find.text('Excel listo'), findsNothing);
       },
     );
 
@@ -271,7 +271,7 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
-            theme: AppTheme.buildLightTheme(),
+            theme: UiTheme.light(),
             home: Scaffold(
               body: Builder(
                 builder: (BuildContext context) {
@@ -303,7 +303,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(shareInvoked, isFalse);
-        expect(find.text('Excel Oficial Generado'), findsNothing);
+        expect(find.text('Excel listo'), findsNothing);
       },
     );
   });

@@ -300,7 +300,7 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(find.text('Excel listo'), findsOneWidget);
         expect(find.text('Asistencia_INF301_01.xlsx'), findsOneWidget);
-        expect(find.textContaining('15360 bytes'), findsOneWidget);
+        expect(find.text('15.0 KB'), findsOneWidget);
 
         final compartirButton = find.widgetWithText(FilledButton, 'Compartir');
         final cerrarButton = find.widgetWithText(TextButton, 'Cerrar');

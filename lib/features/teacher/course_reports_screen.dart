@@ -57,67 +57,32 @@ class CourseReportsScreen extends StatefulWidget {
 
     await showDialog<void>(
       context: context,
-      builder: (BuildContext ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return Theme(
-          data: isDark ? UiTheme.dark() : UiTheme.light(),
-          child: Builder(
-            builder: (BuildContext dialogCtx) {
-              final colors = UiColors.of(dialogCtx);
-
-              return AlertDialog(
-                title: Text(
-                  'Excel listo',
-                  style: UiText.h2.copyWith(color: colors.ink),
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      fileName,
-                      style: UiText.bodyStrong.copyWith(color: colors.ink),
-                    ),
-                    const SizedBox(height: UiSpace.xs),
-                    Text(
-                      '$fileSizeBytes bytes ($sizeKb KB)',
-                      style: UiText.caption.copyWith(color: colors.muted),
-                    ),
-                    SizedBox(
-                      width: 0,
-                      height: 0,
-                      child: Opacity(
-                        opacity: 0,
-                        child: Column(
-                          children: <Widget>[
-                            const Text('Excel Oficial Generado'),
-                            Text(hmacSha256),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                actions: <Widget>[
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogCtx).pop(),
-                    child: const Text('Cerrar'),
-                  ),
-                  FilledButton(
-                    onPressed: () {
-                      Navigator.of(dialogCtx).pop();
-                      onShare();
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colors.primary,
-                      foregroundColor: colors.onPrimary,
-                    ),
-                    child: const Text('Compartir'),
-                  ),
-                ],
-              );
-            },
+      builder: (BuildContext dialogCtx) {
+        final colors = UiColors.of(dialogCtx);
+        return AlertDialog(
+          title: const Text('Excel listo'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(fileName, style: UiText.bodyStrong.copyWith(color: colors.ink)),
+              const SizedBox(height: UiSpace.xs),
+              Text('$sizeKb KB', style: UiText.label.copyWith(color: colors.muted)),
+            ],
           ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cerrar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogCtx).pop();
+                onShare();
+              },
+              child: const Text('Compartir'),
+            ),
+          ],
         );
       },
     );

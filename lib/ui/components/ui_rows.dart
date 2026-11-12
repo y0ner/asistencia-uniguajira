@@ -223,16 +223,31 @@ class UiStatTile extends StatelessWidget {
             border: Border.all(color: pair?.background ?? c.line),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(value, style: UiText.numberMd.copyWith(color: pair?.foreground ?? c.ink)),
+              // Fichas angostas (tres por fila): con letra grande se encogen
+              // en vez de partir la cifra o la palabra en varias líneas.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  style: UiText.numberMd.copyWith(color: pair?.foreground ?? c.ink),
+                ),
+              ),
               const SizedBox(height: UiSpace.xs),
-              Text(
-                label,
-                style: UiText.label.copyWith(
-                  color: pair?.foreground ?? c.muted,
-                  fontWeight: pair == null ? FontWeight.w500 : FontWeight.w600,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: UiText.label.copyWith(
+                    color: pair?.foreground ?? c.muted,
+                    fontWeight: pair == null ? FontWeight.w500 : FontWeight.w600,
+                  ),
                 ),
               ),
             ],
