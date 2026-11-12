@@ -623,9 +623,13 @@ class _LiveAttendanceSessionScreenState
           close: true,
           backTooltip: 'Salir de la sesión',
           onBack: _handleBackPress,
-          trailing: UiPill(
-            label: 'En vivo · ${UiFormat.time(_sessionStartTime)}',
-            dot: true,
+          // Bajo el título y no a la derecha: así el nombre de la clase no se corta.
+          below: Align(
+            alignment: Alignment.centerLeft,
+            child: UiPill(
+              label: 'En vivo · ${UiFormat.time(_sessionStartTime)}',
+              dot: true,
+            ),
           ),
         ),
         body: Column(
