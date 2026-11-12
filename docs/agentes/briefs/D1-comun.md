@@ -36,7 +36,7 @@ Aplican a todos los briefs `D1-*` y `D2-*`, además de `AGENTS.md`.
 ## Criterios comunes de aceptación
 
 - [ ] `grep -n "theme/theme.dart\|AppColors\|AppSpacing\|AppRadii\|AppMotion" <tus archivos>` no devuelve nada.
-- [ ] `grep -nE "Color\(0x|Colors\.(?!transparent)|fontSize:" <tus archivos>` no devuelve nada (usa `grep -P`).
+- [ ] `grep -nP "Color\(0x|(?<![A-Za-z])Colors\.(?!transparent)|fontSize:" <tus archivos>` no devuelve nada. `UiColors.of(context)` es correcto: úsalo directo, sin alias ni extensiones para esquivar la búsqueda.
 - [ ] `grep -niE "BLE|roster|enrol|token|hash|hmac|json|criptogr" <tus archivos>` solo aparece en nombres de código, nunca en textos visibles.
 - [ ] `flutter analyze --no-pub` sin problemas.
 - [ ] Tu prueba nueva pasa.
