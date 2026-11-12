@@ -7,6 +7,7 @@ import '../../core/models/course_model.dart';
 import '../../core/models/session_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/cloud_sync_service.dart';
+import '../../data/services/course_overview_service.dart';
 import '../../data/services/excel_report_service.dart';
 import '../../data/services/report_share_service.dart';
 import '../../ui/ui.dart';
@@ -266,37 +267,19 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
     return (sum / students.length * 10.0).roundToDouble() / 10.0;
   }
 
-  int _countStudentsInLoss(List<StudentAttendanceMetric> students) {
-    return students
-        .where(
-          (StudentAttendanceMetric s) =>
-              s.alertStatus == AttendanceAlertStatus.failureByAbsences ||
-              s.absencePercentage >= 25.0,
-        )
-        .length;
-  }
+  // Mismo criterio que el Excel y que la pantalla de la clase.
+  int _countStudentsInLoss(List<StudentAttendanceMetric> students) =>
+      students.where(CourseOverviewService.isAtRisk).length;
 
-  int _countStudentsInAlert(List<StudentAttendanceMetric> students) {
-    return students
-        .where(
-          (StudentAttendanceMetric s) =>
-              (s.alertStatus == AttendanceAlertStatus.attendanceAlert ||
-                  s.absencePercentage >= 15.0) &&
-              s.alertStatus != AttendanceAlertStatus.failureByAbsences &&
-              s.absencePercentage < 25.0,
-        )
-        .length;
-  }
+  int _countStudentsInAlert(List<StudentAttendanceMetric> students) =>
+      students.where(CourseOverviewService.isInAlert).length;
 
   List<StudentAttendanceMetric> _getFilteredStudents(
     List<StudentAttendanceMetric> allStudents,
   ) {
     return allStudents.where((StudentAttendanceMetric s) {
-      final isLoss = s.alertStatus == AttendanceAlertStatus.failureByAbsences ||
-          s.absencePercentage >= 25.0;
-      final isAlert = (s.alertStatus == AttendanceAlertStatus.attendanceAlert ||
-              s.absencePercentage >= 15.0) &&
-          !isLoss;
+      final isLoss = CourseOverviewService.isAtRisk(s);
+      final isAlert = CourseOverviewService.isInAlert(s);
 
       switch (_currentFilter) {
         case _ReportFilter.alert:
@@ -491,13 +474,8 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
                         ),
                         itemBuilder: (context, index) {
                           final s = filteredStudents[index];
-                          final isLoss = s.alertStatus ==
-                                  AttendanceAlertStatus.failureByAbsences ||
-                              s.absencePercentage >= 25.0;
-                          final isAlert = (s.alertStatus ==
-                                      AttendanceAlertStatus.attendanceAlert ||
-                                  s.absencePercentage >= 15.0) &&
-                              !isLoss;
+                          final isLoss = CourseOverviewService.isAtRisk(s);
+                          final isAlert = CourseOverviewService.isInAlert(s);
 
                           final UiTone tone = isLoss
                               ? UiTone.absent
