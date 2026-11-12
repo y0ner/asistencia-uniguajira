@@ -5,24 +5,26 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/models/course_model.dart';
 import '../../data/local/app_database.dart';
+import '../../data/services/course_overview_service.dart';
 import '../../ui/ui.dart';
 import '../shared/hardware_diagnostic_dialog.dart';
 import 'course_detail_screen.dart';
-
-typedef _Palette = UiColors;
+import 'live_attendance_session_screen.dart';
 
 /// Panel principal de gestión de clases para el docente:
-/// - Lista de clases guardadas en base de datos con conteo de estudiantes.
+/// - Lista de clases guardadas en base de datos con conteo de estudiantes y asistencia.
+/// - Tarjeta hero "Sesión en curso" cuando hay una sesión activa.
 /// - Creación de clases mediante hoja modal con clave secreta aleatoria.
-/// - Eliminación de clases con confirmación y borrado en cascada.
-/// - Navegación al detalle de la clase para gestión y asistencia.
+/// - Navegación al detalle de la clase y a la sesión de asistencia en vivo.
 class CoursesDashboardScreen extends StatefulWidget {
   const CoursesDashboardScreen({
     super.key,
     this.database,
+    this.overviewService,
   });
 
   final AppDatabase? database;
+  final CourseOverviewService? overviewService;
 
   @override
   State<CoursesDashboardScreen> createState() => _CoursesDashboardScreenState();
@@ -30,16 +32,18 @@ class CoursesDashboardScreen extends StatefulWidget {
 
 class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
   late final AppDatabase _database;
+  late final CourseOverviewService _overviewService;
 
   bool _isLoading = true;
   String? _errorMessage;
-  List<CourseModel> _courses = <CourseModel>[];
-  Map<String, int> _studentCounts = <String, int>{};
+  List<CourseOverview> _overviews = <CourseOverview>[];
 
   @override
   void initState() {
     super.initState();
     _database = widget.database ?? AppDatabase.instance;
+    _overviewService = widget.overviewService ??
+        CourseOverviewService(database: _database);
     _loadCourses();
   }
 
@@ -49,18 +53,10 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
       _errorMessage = null;
     });
     try {
-      final courses = await _database.getAllCourses();
-      final counts = <String, int>{};
-
-      for (final course in courses) {
-        final students = await _database.getStudentsByCourse(course.id);
-        counts[course.id] = students.length;
-      }
-
+      final overviews = await _overviewService.loadAll();
       if (mounted) {
         setState(() {
-          _courses = courses;
-          _studentCounts = counts;
+          _overviews = overviews;
           _isLoading = false;
         });
       }
@@ -72,6 +68,26 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
         });
       }
     }
+  }
+
+  CourseOverview? _findMostRecentOpenSession(List<CourseOverview> overviews) {
+    CourseOverview? selected;
+    DateTime? selectedStarted;
+
+    for (final overview in overviews) {
+      final open = overview.openSession;
+      if (open != null) {
+        final started = DateTime.tryParse(open.session.startedAt) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        if (selected == null ||
+            selectedStarted == null ||
+            started.isAfter(selectedStarted)) {
+          selected = overview;
+          selectedStarted = started;
+        }
+      }
+    }
+    return selected;
   }
 
   String _generateRandomSecretHex() {
@@ -100,82 +116,6 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
     }
   }
 
-  Future<void> _showCourseOptionsSheet(CourseModel course) async {
-    await showUiSheet<void>(
-      context,
-      builder: (sheetContext) {
-        final c = _Palette.of(sheetContext);
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: UiSpace.sm),
-            Text(
-              course.name,
-              style: UiText.h2.copyWith(color: c.ink),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: UiSpace.xs),
-            Text(
-              'Grupo ${course.groupCode} · ${course.code}',
-              style: UiText.label.copyWith(color: c.muted),
-            ),
-            const SizedBox(height: UiSpace.lg),
-            InkWell(
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                _confirmDeleteCourse(course);
-              },
-              borderRadius: BorderRadius.circular(UiRadius.md),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: UiSize.touch),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: UiSpace.sm),
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_outline_rounded, color: c.absentText),
-                      const SizedBox(width: UiSpace.md),
-                      Text(
-                        'Eliminar clase',
-                        style: UiText.bodyStrong.copyWith(color: c.absentText),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _confirmDeleteCourse(CourseModel course) async {
-    final confirmed = await showUiConfirm(
-      context,
-      title: '¿Eliminar esta clase?',
-      message:
-          'Se borran sus estudiantes y sus sesiones. No se puede deshacer.',
-      confirmLabel: 'Eliminar',
-      destructive: true,
-    );
-
-    if (confirmed == true) {
-      try {
-        await _database.deleteCourse(course.id);
-        await _loadCourses();
-        if (mounted) {
-          showUiSnack(context, 'Clase eliminada.');
-        }
-      } catch (e) {
-        if (mounted) {
-          showUiSnack(context, 'No se pudo eliminar la clase.');
-        }
-      }
-    }
-  }
-
   void _navigateToCourseDetail(CourseModel course) {
     Navigator.of(context)
         .push(
@@ -186,13 +126,109 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
         .then((_) => _loadCourses());
   }
 
-  Widget _buildCourseCard(CourseModel course) {
-    final colors = _Palette.of(context);
-    final studentCount = _studentCounts[course.id] ?? 0;
-    final hasStudents = studentCount > 0;
+  void _navigateToLiveSession(CourseModel course) {
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) => LiveAttendanceSessionScreen(
+              course: course,
+              database: _database,
+            ),
+          ),
+        )
+        .then((_) => _loadCourses());
+  }
+
+  Widget _buildHeroCard(CourseOverview overview) {
+    final openSession = overview.openSession!;
+    final presentCount = openSession.presentCount;
+    final studentCount = overview.studentCount;
+    final c = UiColors.of(context);
+
+    final String arrivalText;
+    if (presentCount == 0) {
+      arrivalText = 'Aún no llega nadie';
+    } else if (studentCount == 1) {
+      arrivalText = '1 estudiante ya llegó';
+    } else {
+      arrivalText = '$presentCount de $studentCount estudiantes ya llegaron';
+    }
+
+    return UiHeroCard(
+      onTap: () => _navigateToLiveSession(overview.course),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          UiPill(
+            label: 'Sesión en curso',
+            dot: true,
+            background: c.veil,
+            foreground: c.onPrimary,
+          ),
+          const SizedBox(height: UiSpace.md),
+          Text(
+            overview.course.name,
+            style: UiText.h2,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            arrivalText,
+            style: UiText.label,
+          ),
+          const SizedBox(height: UiSpace.md),
+          UiProgressBar(
+            value: openSession.ratio,
+            onHero: true,
+            semanticLabel: '$presentCount de $studentCount presentes',
+          ),
+          const SizedBox(height: UiSpace.lg),
+          UiButton(
+            label: 'Volver a la sesión',
+            variant: UiButtonVariant.onHero,
+            trailingIcon: Icons.arrow_forward_rounded,
+            compact: true,
+            onPressed: () => _navigateToLiveSession(overview.course),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCourseCard(CourseOverview overview) {
+    final course = overview.course;
+    final colors = UiColors.of(context);
+    final hasStudents = overview.hasStudents;
     final subtitle = hasStudents
-        ? 'Grupo ${course.groupCode} · ${UiFormat.count(studentCount, 'estudiante', 'estudiantes')}'
+        ? 'Grupo ${course.groupCode} · ${UiFormat.count(overview.studentCount, 'estudiante', 'estudiantes')}'
         : 'Grupo ${course.groupCode} · Falta agregar estudiantes';
+
+    final Widget rightWidget;
+    if (!hasStudents) {
+      rightWidget = const UiPill(label: 'Nueva', tone: UiTone.manual);
+    } else if (overview.attendancePercent != null) {
+      rightWidget = Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${overview.attendancePercent!.round()} %',
+            style: UiText.title.copyWith(color: colors.ink),
+          ),
+          Text(
+            'asistencia',
+            style: UiText.label.copyWith(color: colors.muted),
+          ),
+        ],
+      );
+    } else {
+      rightWidget = Text(
+        'Sin sesiones',
+        style: UiText.label.copyWith(color: colors.muted),
+      );
+    }
 
     return UiCard(
       radius: 18,
@@ -220,20 +256,11 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                // Bajo el nombre y no a la derecha: así el nombre no se corta.
-                if (!hasStudents) ...[
-                  const SizedBox(height: UiSpace.sm),
-                  const UiPill(label: 'Nueva', tone: UiTone.manual),
-                ],
               ],
             ),
           ),
-          const SizedBox(width: UiSpace.sm),
-          UiRoundIconButton(
-            icon: Icons.more_horiz_rounded,
-            tooltip: 'Opciones de la clase',
-            onPressed: () => _showCourseOptionsSheet(course),
-          ),
+          const SizedBox(width: UiSpace.md),
+          rightWidget,
         ],
       ),
     );
@@ -242,6 +269,9 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
+    final mostRecentOpen = _findMostRecentOpenSession(_overviews);
+    final hasOpenSession = mostRecentOpen != null;
+    final headerCount = hasOpenSession ? 3 : 2;
 
     final Widget body;
     if (_isLoading) {
@@ -258,7 +288,7 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
           ),
         ),
       );
-    } else if (_courses.isEmpty) {
+    } else if (_overviews.isEmpty) {
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -282,7 +312,7 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
         onRefresh: _loadCourses,
         child: ListView.builder(
           padding: const EdgeInsets.only(bottom: UiSpace.xxl),
-          itemCount: _courses.length + 2,
+          itemCount: _overviews.length + headerCount,
           itemBuilder: (BuildContext context, int index) {
             if (index == 0) {
               return UiPageHeading(
@@ -290,14 +320,20 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                 title: '${UiFormat.greeting(now)}, profe',
               );
             }
-            if (index == 1) {
+            if (hasOpenSession && index == 1) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: UiSpace.page),
+                child: _buildHeroCard(mostRecentOpen),
+              );
+            }
+            if (index == headerCount - 1) {
               return const UiSectionTitle('Tus clases');
             }
-            final course = _courses[index - 2];
+            final overview = _overviews[index - headerCount];
             return Padding(
               padding:
                   const EdgeInsets.fromLTRB(UiSpace.page, 0, UiSpace.page, 10),
-              child: _buildCourseCard(course),
+              child: _buildCourseCard(overview),
             );
           },
         ),
@@ -312,7 +348,7 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
           onPressed: () => showHardwareDiagnosticDialog(context),
         ),
       ),
-      bottom: _isLoading || _errorMessage != null || _courses.isEmpty
+      bottom: _isLoading || _errorMessage != null || _overviews.isEmpty
           ? null
           : UiButton(
               label: 'Nueva clase',
@@ -396,7 +432,7 @@ class _CreateCourseSheetState extends State<_CreateCourseSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final c = _Palette.of(context);
+    final c = UiColors.of(context);
     return SingleChildScrollView(
       child: Form(
         key: _formKey,
