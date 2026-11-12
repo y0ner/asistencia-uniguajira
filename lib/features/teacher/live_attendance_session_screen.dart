@@ -505,10 +505,12 @@ class _LiveAttendanceSessionScreenState
       final isBluetoothOff = perm.onlyBluetoothOff;
       final title =
           isBluetoothOff ? 'El Bluetooth está apagado' : 'Falta un permiso';
-      final message = perm.failureMessage ??
-          (isBluetoothOff
-              ? 'Enciende el Bluetooth para iniciar la sesión.'
-              : 'Se requieren permisos para iniciar la sesión.');
+      // El texto lo decide la pantalla: el del servicio repite el título.
+      final message = isBluetoothOff
+          ? 'Enciéndelo para que tus estudiantes puedan registrarse.'
+          : perm.requiresAppSettings
+              ? 'Abre los ajustes y permite «Dispositivos cercanos» para tomar asistencia.'
+              : 'Permite el acceso a «Dispositivos cercanos» para tomar asistencia.';
 
       return UiPage(
         header: UiTopBar(
