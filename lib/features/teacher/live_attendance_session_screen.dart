@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/constants/app_constants.dart';
-import '../../core/crypto/ble_packet_codec.dart';
 import '../../core/models/attendance_record_model.dart';
 import '../../core/models/course_model.dart';
 import '../../core/models/student_model.dart';
@@ -12,14 +11,19 @@ import '../../data/local/app_database.dart';
 import '../../data/services/attendance_session_controller.dart';
 import '../../data/services/ble_attendance_service.dart';
 import '../../data/services/ble_permission_service.dart';
-import '../../theme/theme.dart';
+import '../../ui/ui.dart';
 import 'signed_acta_dialog.dart';
 
-/// Pantalla de Sesión de Asistencia Docente en Vivo:
-/// - Cabecera con PIN Verbal de 2 dígitos y visualizador en tiempo real del Mapa de Bits (64 bits / 8 bytes).
-/// - Pestaña 1: Radar BLE en vivo con confirmación criptográfica en tiempo real.
-/// - Pestaña 2: Lista invertida a 1 toque con priorización de pendientes y buscador rápido.
-/// - Cierre y firma criptográfica de acta con HMAC-SHA256.
+/// Filtro de visualización de la lista de asistencia.
+enum _AttendanceFilter { all, missing, present }
+
+typedef _Palette = UiColors;
+
+/// Pantalla de Sesión de Asistencia Docente en Vivo.
+///
+/// Permite al docente monitorear la asistencia de los estudiantes en tiempo real,
+/// verificar llegadas por Bluetooth, marcar o editar notas de asistencia a mano,
+/// y cerrar y firmar la sesión de la clase.
 class LiveAttendanceSessionScreen extends StatefulWidget {
   const LiveAttendanceSessionScreen({
     super.key,
@@ -55,19 +59,18 @@ class LiveAttendanceSessionScreen extends StatefulWidget {
 }
 
 class _LiveAttendanceSessionScreenState
-    extends State<LiveAttendanceSessionScreen>
-    with SingleTickerProviderStateMixin {
+    extends State<LiveAttendanceSessionScreen> {
   late final AppDatabase _database;
   late final BleAttendanceService _bleService;
   late final BlePermissionService _permissionService;
   late final AttendanceSessionController _controller;
   late final bool _ownsController;
-  late final TabController _tabController;
 
   bool _isStarting = true;
   bool _isClosing = false;
   String? _initError;
   BlePermissionResult? _permissionResult;
+  BleRuntimeIssue? _lastBleIssue;
 
   List<StudentModel> _students = <StudentModel>[];
   Map<String, AttendanceRecordModel> _recordsByStudentId =
@@ -77,14 +80,16 @@ class _LiveAttendanceSessionScreenState
   StreamSubscription<BleRuntimeIssue>? _bleIssuesSub;
   Timer? _periodicRefreshTimer;
 
+  _AttendanceFilter _selectedFilter = _AttendanceFilter.all;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  late final DateTime _sessionStartTime;
 
   @override
   void initState() {
     super.initState();
+    _sessionStartTime = DateTime.now();
     unawaited(WakelockPlus.enable());
-    _tabController = TabController(length: 2, vsync: this);
     _database = widget.database ?? AppDatabase.instance;
     _bleService = widget.bleService ?? BleAttendanceService();
     _permissionService =
@@ -106,7 +111,6 @@ class _LiveAttendanceSessionScreenState
   @override
   void dispose() {
     unawaited(WakelockPlus.disable());
-    _tabController.dispose();
     _searchController.dispose();
     _periodicRefreshTimer?.cancel();
     _bleEventsSub?.cancel();
@@ -125,7 +129,6 @@ class _LiveAttendanceSessionScreenState
     });
 
     try {
-      // Diagnóstico y solicitud previa de permisos / Bluetooth
       final permResult = await _permissionService.ensureReady();
       if (!permResult.isReady) {
         if (mounted) {
@@ -143,8 +146,6 @@ class _LiveAttendanceSessionScreenState
         (StudentModel a, StudentModel b) => a.bitIndex.compareTo(b.bitIndex),
       );
 
-      // Si el controlador ya tiene una sesión abierta para este curso, la reutilizamos;
-      // en caso contrario, abrimos una nueva sesión.
       if (_controller.state == null || !_controller.state!.isOpen) {
         await _controller.startTeacherSession(
           course: widget.course,
@@ -161,9 +162,7 @@ class _LiveAttendanceSessionScreenState
         };
       }
 
-      // Escuchamos el stream de paquetes BLE para refrescar registros automáticamente
       _bleEventsSub = _bleService.packetEvents.listen((_) {
-        // Le damos un breve margen al controller para que aplique la transacción en SQLite
         Future<void>.delayed(const Duration(milliseconds: 100), () {
           if (mounted) {
             _reloadRecords();
@@ -171,14 +170,14 @@ class _LiveAttendanceSessionScreenState
         });
       });
 
-      // Escuchamos incidencias BLE en tiempo real para refrescar advertencias
-      _bleIssuesSub = _bleService.issues.listen((_) {
+      _bleIssuesSub = _bleService.issues.listen((issue) {
         if (mounted) {
-          setState(() {});
+          setState(() {
+            _lastBleIssue = issue;
+          });
         }
       });
 
-      // Polling ligero cada 1.5s para mantener sincronizado el Bitmap y la base de datos
       _periodicRefreshTimer = Timer.periodic(
         const Duration(milliseconds: 1500),
         (_) {
@@ -220,7 +219,6 @@ class _LiveAttendanceSessionScreenState
         });
       }
     } catch (e) {
-      // Registramos aviso en lecturas concurrentes transitorias
       debugPrint('Aviso transitorio al recargar registros de asistencia: $e');
     }
   }
@@ -239,126 +237,170 @@ class _LiveAttendanceSessionScreenState
       await _reloadRecords();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al cambiar asistencia manual: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      showUiSnack(context, 'No se pudo actualizar la asistencia: $e');
     }
   }
 
-  Future<void> _showObservationDialog(StudentModel student) async {
+  Future<void> _handleMarkStudent(StudentModel student) async {
+    await _handleToggleManual(student, true);
+    if (!mounted) return;
+    await _showObservationSheet(student, isEditing: false);
+  }
+
+  Future<void> _showObservationSheet(
+    StudentModel student, {
+    required bool isEditing,
+  }) async {
     final currentRecord = _recordsByStudentId[student.id];
     final textController =
         TextEditingController(text: currentRecord?.observation ?? '');
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext ctx) {
-        return AlertDialog(
-          title: Text('Observación: ${student.fullName}'),
-          content: TextField(
-            controller: textController,
-            decoration: const InputDecoration(
-              hintText: 'Ej. Sin smartphone, batería agotada, iPhone sin app...',
-              border: OutlineInputBorder(),
+    await showUiSheet<void>(
+      context,
+      builder: (sheetContext) {
+        final c = _Palette.of(sheetContext);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: UiSpace.lg),
+            Text(
+              isEditing ? 'Editar nota' : 'Nota (opcional)',
+              style: UiText.h2.copyWith(color: c.ink),
             ),
-            maxLines: 3,
-            autofocus: true,
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancelar'),
+            const SizedBox(height: UiSpace.xs),
+            Text(
+              student.fullName,
+              style: UiText.caption.copyWith(color: c.muted),
             ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Guardar'),
+            const SizedBox(height: UiSpace.md),
+            TextField(
+              controller: textController,
+              autofocus: true,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                hintText: 'No trajo celular',
+              ),
+            ),
+            const SizedBox(height: UiSpace.lg),
+            Row(
+              children: [
+                Expanded(
+                  child: UiButton(
+                    label: isEditing ? 'Cancelar' : 'Omitir',
+                    variant: UiButtonVariant.outline,
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                  ),
+                ),
+                const SizedBox(width: UiSpace.md),
+                Expanded(
+                  child: UiButton(
+                    label: 'Guardar',
+                    variant: UiButtonVariant.primary,
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      final obs = textController.text.trim();
+                      _handleToggleManual(
+                        student,
+                        true,
+                        observation: obs.isEmpty ? null : obs,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showManualActionSheet(StudentModel student) async {
+    final action = await showUiSheet<String>(
+      context,
+      builder: (sheetContext) {
+        final c = _Palette.of(sheetContext);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: UiSpace.lg),
+            Text(
+              student.fullName,
+              style: UiText.h2.copyWith(color: c.ink),
+            ),
+            const SizedBox(height: UiSpace.xs),
+            Text(
+              'Asistencia registrada a mano',
+              style: UiText.caption.copyWith(color: c.muted),
+            ),
+            const SizedBox(height: UiSpace.lg),
+            UiButton(
+              label: 'Editar nota',
+              variant: UiButtonVariant.tonal,
+              icon: Icons.edit_outlined,
+              onPressed: () => Navigator.of(sheetContext).pop('edit'),
+            ),
+            const SizedBox(height: UiSpace.sm),
+            UiButton(
+              label: 'Quitar marca',
+              variant: UiButtonVariant.outline,
+              icon: Icons.remove_circle_outline_rounded,
+              onPressed: () => Navigator.of(sheetContext).pop('remove'),
             ),
           ],
         );
       },
     );
 
-    if (confirmed == true && mounted) {
-      final obs = textController.text.trim();
-      await _handleToggleManual(
-        student,
-        true,
-        observation: obs.isEmpty ? null : obs,
-      );
+    if (!mounted || action == null) return;
+
+    if (action == 'remove') {
+      await _handleToggleManual(student, false);
+    } else if (action == 'edit') {
+      await _showObservationSheet(student, isEditing: true);
+    }
+  }
+
+  Future<bool> _confirmLeaveSession() {
+    return showUiConfirm(
+      context,
+      title: '¿Salir de la sesión?',
+      message: 'La sesión sigue abierta. Puedes volver desde la clase.',
+      confirmLabel: 'Salir',
+      cancelLabel: 'Seguir aquí',
+    );
+  }
+
+  Future<void> _handleBackPress() async {
+    final shouldLeave = await _confirmLeaveSession();
+    if (shouldLeave && mounted) {
+      Navigator.of(context).pop();
     }
   }
 
   Future<void> _handleCloseAndSignSession() async {
     final state = _controller.state;
     if (state == null || !state.isOpen) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La sesión ya ha sido cerrada.')),
-      );
+      showUiSnack(context, 'La sesión ya ha sido cerrada.');
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext ctx) {
-        final theme = Theme.of(ctx);
-        final presentCount = _recordsByStudentId.length;
-        final totalCount = _students.length;
+    final presentCount = _recordsByStudentId.length;
+    final totalCount = _students.length;
+    final missingCount = totalCount - presentCount;
 
-        return AlertDialog(
-          icon: Icon(
-            Icons.lock_clock,
-            size: 40,
-            color: theme.colorScheme.primary,
-          ),
-          title: const Text('¿Cerrar y Firmar Sesión?'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const Text(
-                'Al cerrar la sesión se detendrá el radar BLE, se consolidará el Mapa de Bits final y se generará el Acta Criptográfica firmada con HMAC-SHA256.',
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: AppSpacing.of(context).insetsSm,
-                decoration: BoxDecoration(
-                  color: AppColors.of(context).surfaceContainerHigh,
-                  borderRadius: AppRadii.of(context).borderSm,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: <Widget>[
-                    const Text('Resumen actual:'),
-                    Text(
-                      '$presentCount presentes / $totalCount matriculados',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              style: FilledButton.styleFrom(
-                shape: AppRadii.of(context).buttonShape(),
-              ),
-              child: const Text('Cerrar y Firmar Acta'),
-            ),
-          ],
-        );
-      },
+    final confirmed = await showUiConfirm(
+      context,
+      title: '¿Cerrar la sesión?',
+      message:
+          'Llegaron $presentCount de $totalCount. Los $missingCount que faltan quedarán con falta. Después de firmar no se puede cambiar.',
+      confirmLabel: 'Cerrar y firmar',
+      cancelLabel: 'Cancelar',
     );
 
-    if (confirmed != true || !mounted) {
+    if (!confirmed || !mounted) {
       return;
     }
 
@@ -371,7 +413,6 @@ class _LiveAttendanceSessionScreenState
 
       setState(() => _isClosing = false);
 
-      // Muestra el modal con el Acta Criptográfica Oficial
       await SignedActaDialog.show(
         context,
         acta: signedActa,
@@ -379,45 +420,79 @@ class _LiveAttendanceSessionScreenState
       );
 
       if (!mounted) return;
-
-      // Volvemos al detalle del curso indicando que la sesión concluyó exitosamente
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isClosing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al cerrar y firmar la sesión: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      showUiSnack(context, 'No se pudo cerrar la sesión: $e');
+    }
+  }
+
+  List<StudentModel> _getFilteredStudents() {
+    final query = _searchQuery.trim().toLowerCase();
+
+    var list = _students;
+    if (query.isNotEmpty) {
+      list = list.where((s) {
+        return s.fullName.toLowerCase().contains(query) ||
+            s.studentCode.toLowerCase().contains(query);
+      }).toList();
+    }
+
+    switch (_selectedFilter) {
+      case _AttendanceFilter.missing:
+        return list
+            .where((s) => !_recordsByStudentId.containsKey(s.id))
+            .toList();
+      case _AttendanceFilter.present:
+        final recent = <StudentModel>[];
+        final others = <StudentModel>[];
+        final now = DateTime.now();
+        for (final s in list) {
+          final r = _recordsByStudentId[s.id];
+          if (r == null) continue;
+          final t = DateTime.tryParse(r.recordedAt);
+          if (t != null && now.difference(t).inSeconds.abs() < 10) {
+            recent.add(s);
+          } else {
+            others.add(s);
+          }
+        }
+        return [...recent, ...others];
+      case _AttendanceFilter.all:
+        final recent = <StudentModel>[];
+        final others = <StudentModel>[];
+        final now = DateTime.now();
+        for (final s in list) {
+          final r = _recordsByStudentId[s.id];
+          if (r != null) {
+            final t = DateTime.tryParse(r.recordedAt);
+            if (t != null && now.difference(t).inSeconds.abs() < 10) {
+              recent.add(s);
+              continue;
+            }
+          }
+          others.add(s);
+        }
+        return [...recent, ...others];
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
+    final c = _Palette.of(context);
 
     if (_isStarting) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Sesión BLE: ${widget.course.name}'),
-          backgroundColor: colors.primary,
-          foregroundColor: colors.onPrimary,
-        ),
+      return UiPage(
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
+            children: [
               const CircularProgressIndicator(),
-              SizedBox(height: spacing.md),
-              const Text(
-                'Inicializando Radar BLE y Mapa de Bits...',
-                style: TextStyle(fontWeight: FontWeight.w600),
+              const SizedBox(height: UiSpace.lg),
+              Text(
+                'Abriendo la sesión…',
+                style: UiText.bodyStrong.copyWith(color: c.ink),
               ),
             ],
           ),
@@ -427,79 +502,76 @@ class _LiveAttendanceSessionScreenState
 
     if (_permissionResult != null && !_permissionResult!.isReady) {
       final perm = _permissionResult!;
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(widget.course.name),
-          backgroundColor: colors.primary,
-          foregroundColor: colors.onPrimary,
+      final isBluetoothOff = perm.onlyBluetoothOff;
+      final title =
+          isBluetoothOff ? 'El Bluetooth está apagado' : 'Falta un permiso';
+      final message = perm.failureMessage ??
+          (isBluetoothOff
+              ? 'Enciende el Bluetooth para iniciar la sesión.'
+              : 'Se requieren permisos para iniciar la sesión.');
+
+      return UiPage(
+        header: UiTopBar(
+          title: widget.course.name,
+          onBack: () => Navigator.of(context).pop(),
         ),
         body: Center(
-          child: Padding(
-            padding: spacing.insetsLg,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(UiSpace.xxxl),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Icon(
-                  perm.onlyBluetoothOff
-                      ? Icons.bluetooth_disabled
-                      : Icons.security_update_warning_outlined,
-                  size: 54,
-                  color: colors.statusAlerta,
-                ),
-                SizedBox(height: spacing.md),
-                Text(
-                  perm.onlyBluetoothOff
-                      ? 'Bluetooth Apagado'
-                      : 'Permisos Requeridos',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+              children: [
+                Container(
+                  width: 88,
+                  height: 88,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: c.tint,
+                    borderRadius: BorderRadius.circular(UiRadius.xxl),
+                  ),
+                  child: Icon(
+                    isBluetoothOff
+                        ? Icons.bluetooth_disabled_rounded
+                        : Icons.security_update_warning_rounded,
+                    size: 40,
+                    color: c.tintText,
                   ),
                 ),
-                SizedBox(height: spacing.xs),
+                const SizedBox(height: UiSpace.xl),
                 Text(
-                  perm.failureMessage ??
-                      'Se requiere habilitar el Bluetooth para iniciar la sesión.',
+                  title,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceMuted,
-                  ),
+                  style: UiText.h2.copyWith(color: c.ink),
                 ),
-                SizedBox(height: spacing.lg),
-                if (perm.requiresAppSettings) ...<Widget>[
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      shape: radii.buttonShape(),
-                      backgroundColor: colors.primary,
-                      foregroundColor: colors.onPrimary,
-                    ),
+                const SizedBox(height: UiSpace.sm),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: UiText.body.copyWith(color: c.muted),
+                ),
+                const SizedBox(height: UiSpace.xl),
+                if (perm.requiresAppSettings) ...[
+                  UiButton(
+                    label: 'Abrir ajustes',
                     onPressed: () async {
                       await _permissionService.openAppSettings();
                     },
-                    icon: const Icon(Icons.settings),
-                    label: const Text('Abrir Ajustes'),
                   ),
-                  SizedBox(height: spacing.sm),
-                ] else if (perm.onlyBluetoothOff) ...<Widget>[
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      shape: radii.buttonShape(),
-                      backgroundColor: colors.statusNormal,
-                      foregroundColor: colors.onStatusNormal,
-                    ),
+                  const SizedBox(height: UiSpace.sm),
+                ] else if (isBluetoothOff) ...[
+                  UiButton(
+                    label: 'Encender Bluetooth',
                     onPressed: () async {
                       await _permissionService.turnOnBluetooth();
                       await _initializeSession();
                     },
-                    icon: const Icon(Icons.bluetooth),
-                    label: const Text('Encender Bluetooth'),
                   ),
-                  SizedBox(height: spacing.sm),
+                  const SizedBox(height: UiSpace.sm),
                 ],
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(shape: radii.buttonShape()),
+                UiButton(
+                  label: 'Volver a intentar',
+                  variant: UiButtonVariant.outline,
                   onPressed: _initializeSession,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Reintentar Verificación'),
                 ),
               ],
             ),
@@ -509,37 +581,17 @@ class _LiveAttendanceSessionScreenState
     }
 
     if (_initError != null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(widget.course.name),
-          backgroundColor: colors.primary,
-          foregroundColor: colors.onPrimary,
+      return UiPage(
+        header: UiTopBar(
+          title: widget.course.name,
+          onBack: () => Navigator.of(context).pop(),
         ),
-        body: Center(
-          child: Padding(
-            padding: spacing.insetsLg,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Icon(Icons.error_outline, size: 48, color: colors.statusPerdida),
-                SizedBox(height: spacing.md),
-                Text(
-                  'Error al iniciar sesión',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: spacing.xs),
-                Text(_initError!, textAlign: TextAlign.center),
-                SizedBox(height: spacing.md),
-                FilledButton(
-                  style: FilledButton.styleFrom(shape: radii.buttonShape()),
-                  onPressed: _initializeSession,
-                  child: const Text('Reintentar'),
-                ),
-              ],
-            ),
-          ),
+        body: UiEmptyState(
+          title: 'No se pudo abrir la sesión',
+          message: _initError!,
+          icon: Icons.error_outline_rounded,
+          actionLabel: 'Volver a intentar',
+          onAction: _initializeSession,
         ),
       );
     }
@@ -547,1131 +599,277 @@ class _LiveAttendanceSessionScreenState
     final activeState = _controller.state;
     final pinStr = activeState?.sessionPin ??
         (widget.customPin?.toString().padLeft(2, '0') ?? '00');
-    final bitmapHex = activeState?.bitmapHex ?? AppConstants.emptyBitmapHex;
 
-    // Métricas en tiempo real
-    var presentBleCount = 0;
-    var presentManualCount = 0;
-    for (final record in _recordsByStudentId.values) {
-      if (record.method == AppConstants.attendanceMethodBleHmac) {
-        presentBleCount++;
-      } else {
-        presentManualCount++;
-      }
-    }
-    final totalPresent = presentBleCount + presentManualCount;
-    final totalEnrolled = _students.length;
-    final absentCount = totalEnrolled - totalPresent;
+    final presentCount = _recordsByStudentId.length;
+    final totalStudents = _students.length;
+    final missingCount = totalStudents - presentCount;
+
+    final displayedStudents = _getFilteredStudents();
+
+    final bleWarning = _controller.bleWarning;
+    final hasBleIssue =
+        _lastBleIssue != null || (bleWarning != null && bleWarning.isNotEmpty);
+    final bleIssueMessage = _lastBleIssue?.message ?? bleWarning ?? '';
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) async {
         if (didPop) return;
-        final shouldLeave = await showDialog<bool>(
-          context: context,
-          builder: (BuildContext ctx) => AlertDialog(
-            title: const Text('¿Salir de la sesión en vivo?'),
-            content: const Text(
-              'La sesión permanecerá abierta en segundo plano. Podrás volver a ella o cerrarla firmando el acta.',
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Continuar aquí'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('Salir'),
-              ),
-            ],
-          ),
-        );
-        if (shouldLeave == true && context.mounted) {
-          Navigator.of(context).pop();
-        }
+        await _handleBackPress();
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.course.name),
-          backgroundColor: colors.primary,
-          foregroundColor: colors.onPrimary,
-          actions: <Widget>[
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'Refrescar estado',
-              onPressed: _reloadRecords,
-            ),
-          ],
+      child: UiPage(
+        header: UiTopBar(
+          title: widget.course.name,
+          close: true,
+          backTooltip: 'Salir de la sesión',
+          onBack: _handleBackPress,
+          trailing: UiPill(
+            label: 'En vivo · ${UiFormat.time(_sessionStartTime)}',
+            dot: true,
+          ),
         ),
         body: Column(
-          children: <Widget>[
-            // Cabecera de Sesión Activa: PIN + Mapa de Bits + Contadores
-            _buildActiveSessionHeader(
-              theme: theme,
-              pinStr: pinStr,
-              bitmapHex: bitmapHex,
-              presentBleCount: presentBleCount,
-              presentManualCount: presentManualCount,
-              absentCount: absentCount,
-              totalPresent: totalPresent,
-              totalEnrolled: totalEnrolled,
-            ),
-
-            // TabBar con las dos pestañas principales
-            Container(
-              color: colors.surface,
-              child: TabBar(
-                controller: _tabController,
-                indicatorColor: colors.primary,
-                labelColor: colors.primary,
-                unselectedLabelColor: colors.onSurfaceMuted,
-                tabs: <Widget>[
-                  Tab(
-                    icon: const Icon(Icons.sensors),
-                    text: 'Radar BLE en Vivo ($presentBleCount)',
-                  ),
-                  Tab(
-                    icon: const Icon(Icons.checklist_rtl),
-                    text: 'Lista Invertida ($absentCount)',
-                  ),
-                ],
-              ),
-            ),
-
-            // Vista de las dos pestañas
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: <Widget>[
-                  // Pestaña 1: Radar BLE en Vivo
-                  _buildRadarBleTab(theme),
-
-                  // Pestaña 2: Lista Invertida (1 Toque)
-                  _buildInvertedListTab(theme),
-                ],
-              ),
-            ),
-
-            // Barra Inferior con Botón de Cierre y Firma
-            _buildBottomActionBar(theme),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActiveSessionHeader({
-    required ThemeData theme,
-    required String pinStr,
-    required String bitmapHex,
-    required int presentBleCount,
-    required int presentManualCount,
-    required int absentCount,
-    required int totalPresent,
-    required int totalEnrolled,
-  }) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-
-    final active = _controller.state;
-    final bleWarning = _controller.bleWarning;
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: colors.outlineVariant,
-          ),
-        ),
-      ),
-      child: Column(
-        children: <Widget>[
-          // Alerta no bloqueante si hay advertencias de hardware BLE
-          if (bleWarning != null && bleWarning.isNotEmpty)
-            Container(
-              width: double.infinity,
-              padding: spacing.symmetric(horizontal: spacing.md, vertical: spacing.xxs),
-              color: colors.statusAlertaContainer,
-              child: Row(
-                children: <Widget>[
-                  Icon(Icons.warning_amber, size: 16, color: colors.statusAlerta),
-                  SizedBox(width: spacing.xs),
-                  Expanded(
-                    child: Text(
-                      bleWarning,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colors.onStatusAlertaContainer,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: UiSpace.page),
+              child: UiCard(
+                radius: UiRadius.xl,
+                padding: const EdgeInsets.all(UiSpace.lg),
+                child: Row(
+                  children: [
+                    UiProgressRing.count(
+                      count: presentCount,
+                      total: totalStudents,
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-          Padding(
-            padding: spacing.fromLTRB(spacing.md, spacing.sm, spacing.md, spacing.sm),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                // PIN Verbal de Aula en Grande y Llamativo
-                Container(
-                  padding: spacing.symmetric(
-                    horizontal: spacing.md,
-                    vertical: spacing.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.primary,
-                    borderRadius: radii.borderLg,
-                    boxShadow: <BoxShadow>[
-                      BoxShadow(
-                        color: colors.primary.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Row(
+                    const SizedBox(width: UiSpace.lg),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Icon(
-                            Icons.record_voice_over,
-                            color: colors.onPrimary.withValues(alpha: 0.7),
-                            size: 14,
-                          ),
-                          SizedBox(width: spacing.xxs),
+                        children: [
                           Text(
-                            'PIN DE AULA',
-                            style: TextStyle(
-                              color: colors.onPrimary.withValues(alpha: 0.7),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.8,
+                            'PIN de la clase',
+                            style: UiText.caption.copyWith(
+                              color: c.muted,
+                              fontWeight: FontWeight.w600,
                             ),
+                          ),
+                          const SizedBox(height: UiSpace.xs),
+                          UiPinDisplay(pin: pinStr),
+                          const SizedBox(height: UiSpace.xs),
+                          Text(
+                            'Díctalo en voz alta',
+                            style: UiText.caption.copyWith(color: c.muted),
                           ),
                         ],
-                      ),
-                      SizedBox(height: spacing.xxs / 2),
-                      Text(
-                        pinStr,
-                        style: TextStyle(
-                          color: colors.onPrimary,
-                          fontSize: 34,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: 'monospace',
-                          letterSpacing: 2,
-                        ),
-                      ),
-                      Text(
-                        'Dilo en voz alta',
-                        style: TextStyle(
-                          color: colors.onPrimary.withValues(alpha: 0.6),
-                          fontSize: 9,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: spacing.sm),
-
-                // Visualizador del Mapa de Bits de 64 posiciones en tiempo real
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          Text(
-                            'Mapa de Bits 64-Bit',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '0x$bitmapHex',
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: totalPresent > 0
-                                  ? colors.statusNormal
-                                  : colors.onSurfaceMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: spacing.xxs),
-                      // Cuadrícula compacta de 64 celdas (4 filas x 16 columnas)
-                      _buildBitmapGrid(active, theme),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Barra de Contadores en vivo
-          Container(
-            padding: spacing.symmetric(horizontal: spacing.md, vertical: spacing.xs),
-            decoration: BoxDecoration(
-              color: colors.surfaceContainerLow,
-              border: Border(
-                top: BorderSide(
-                  color: colors.outlineVariant,
-                ),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: <Widget>[
-                _buildLiveBadge(
-                  label: 'BLE',
-                  count: presentBleCount,
-                  color: colors.statusNormal,
-                  icon: Icons.bluetooth_connected,
-                ),
-                _buildLiveBadge(
-                  label: 'Manual',
-                  count: presentManualCount,
-                  color: colors.manualAccent,
-                  icon: Icons.touch_app,
-                ),
-                _buildLiveBadge(
-                  label: 'Pendientes',
-                  count: absentCount,
-                  color: colors.statusPerdida,
-                  icon: Icons.person_off,
-                ),
-                _buildLiveBadge(
-                  label: 'Total',
-                  countStr: '$totalPresent / $totalEnrolled',
-                  color: colors.primary,
-                  icon: Icons.groups,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBitmapGrid(ActiveCourseSessionState? active, ThemeData theme) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-    final bitmap8 = active?.bitmap8;
-
-    return Container(
-      padding: spacing.insetsXxs,
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerLow,
-        borderRadius: radii.borderSm,
-        border: Border.all(
-          color: colors.outlineVariant,
-        ),
-      ),
-      child: Column(
-        children: List<Widget>.generate(4, (int rowIndex) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List<Widget>.generate(16, (int colIndex) {
-              final bitIndex = rowIndex * 16 + colIndex;
-              final isEnrolled = active?.studentByBitIndex.containsKey(bitIndex) ?? false;
-              final isSet = bitmap8 != null &&
-                  BlePacketCodec.isStudentBitSet(bitmap8, bitIndex);
-
-              Color cellColor;
-              if (isSet) {
-                cellColor = colors.statusNormal;
-              } else if (isEnrolled) {
-                cellColor = colors.surfaceContainerHigh;
-              } else {
-                cellColor = Colors.transparent;
-              }
-
-              final student = active?.studentByBitIndex[bitIndex];
-              final tooltipMessage = student != null
-                  ? 'Bit #$bitIndex: ${student.fullName} (${isSet ? "Presente" : "Pendiente"})'
-                  : 'Bit #$bitIndex: Vacante';
-
-              return Tooltip(
-                message: tooltipMessage,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  margin: spacing.all(1),
-                  decoration: BoxDecoration(
-                    color: cellColor,
-                    borderRadius: radii.borderXs,
-                    border: Border.all(
-                      color: isSet
-                          ? colors.statusNormal
-                          : (isEnrolled
-                              ? colors.outline
-                              : colors.outlineVariant),
-                      width: 0.6,
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    bitIndex.toString(),
-                    style: TextStyle(
-                      fontSize: 7,
-                      fontWeight: FontWeight.bold,
-                      color: isSet
-                          ? colors.onStatusNormal
-                          : (isEnrolled ? colors.onSurface : colors.outlineVariant),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildLiveBadge({
-    required String label,
-    int? count,
-    String? countStr,
-    required Color color,
-    required IconData icon,
-  }) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final displayValue = countStr ?? count.toString();
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Icon(icon, size: 14, color: color),
-        SizedBox(width: spacing.xxs),
-        Text(
-          '$label: ',
-          style: TextStyle(
-            fontSize: 12,
-            color: colors.onSurfaceMuted,
-          ),
-        ),
-        Text(
-          displayValue,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Pestaña 1: Radar BLE en Vivo
-  // ---------------------------------------------------------------------------
-
-  Widget _buildRadarBleTab(ThemeData theme) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-
-    final bleStudents = _students.where((StudentModel s) {
-      final r = _recordsByStudentId[s.id];
-      return r != null && r.method == AppConstants.attendanceMethodBleHmac;
-    }).toList(growable: false);
-
-    return ListView(
-      padding: spacing.insetsMd,
-      children: <Widget>[
-        // Tarjeta de Radar Activo
-        Container(
-          padding: spacing.insetsMd,
-          decoration: BoxDecoration(
-            color: colors.statusNormalContainer.withValues(alpha: 0.35),
-            borderRadius: radii.borderMd,
-            border: Border.all(color: colors.statusNormal.withValues(alpha: 0.4)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Container(
-                    padding: spacing.insetsXs,
-                    decoration: BoxDecoration(
-                      color: colors.statusNormal,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.sensors,
-                      color: colors.onStatusNormal,
-                      size: 20,
-                    ),
-                  ),
-                  SizedBox(width: spacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          'Radar BLE Activo',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: colors.onSurface,
-                          ),
-                        ),
-                        Text(
-                          'Emitiendo Eco (16 bytes) y escuchando Beacons (RSSI >= -75 dBm)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: colors.onStatusNormalContainer,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: spacing.md),
-
-        // Encabezado de la lista
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: <Widget>[
-            Text(
-              'Confirmados por Bluetooth (${bleStudents.length})',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              'Criptografía HMAC-SHA256',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colors.onSurfaceMuted,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: spacing.xs),
-
-        if (bleStudents.isEmpty)
-          _buildEmptyBleView(theme)
-        else
-          ...bleStudents.map((StudentModel student) {
-            final record = _recordsByStudentId[student.id];
-            return _buildBleStudentTile(theme, student, record);
-          }),
-      ],
-    );
-  }
-
-  Widget _buildEmptyBleView(ThemeData theme) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-
-    return Container(
-      padding: spacing.symmetric(vertical: spacing.xl, horizontal: spacing.lg),
-      alignment: Alignment.center,
-      child: Column(
-        children: <Widget>[
-          Icon(
-            Icons.radar,
-            size: 54,
-            color: colors.onSurfaceMuted.withValues(alpha: 0.5),
-          ),
-          SizedBox(height: spacing.sm),
-          Text(
-            'Esperando anuncios BLE de estudiantes',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: spacing.xxs),
-          Text(
-            'Pide a los estudiantes ingresar el PIN del aula en su app. '
-            'Aparecerán aquí con su token UG-XXXXXXXX una vez confirmados.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colors.onSurfaceMuted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBleStudentTile(
-    ThemeData theme,
-    StudentModel student,
-    AttendanceRecordModel? record,
-  ) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-
-    final bitPadded = student.bitIndex.toString().padLeft(2, '0');
-    final rssiInt = record?.rssiAvg?.round() ?? -60;
-    final token = record?.hmacTag ?? 'UG-????????';
-
-    return Card(
-      elevation: 0,
-      margin: spacing.only(bottom: spacing.xs),
-      shape: radii.cardShape(
-        side: BorderSide(color: colors.statusNormal.withValues(alpha: 0.3)),
-      ),
-      color: colors.statusNormalContainer.withValues(alpha: 0.25),
-      child: Padding(
-        padding: spacing.insetsSm,
-        child: Row(
-          children: <Widget>[
-            Container(
-              padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
-              decoration: BoxDecoration(
-                color: colors.statusNormal,
-                borderRadius: radii.borderSm,
-              ),
-              child: Text(
-                '#$bitPadded',
-                style: TextStyle(
-                  color: colors.onStatusNormal,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                ),
-              ),
-            ),
-            SizedBox(width: spacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    student.fullName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: spacing.xxs / 2),
-                  Row(
-                    children: <Widget>[
-                      Text(
-                        'Cód: ${student.studentCode}',
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: colors.primary,
-                        ),
-                      ),
-                      SizedBox(width: spacing.xs),
-                      Container(
-                        padding: spacing.symmetric(
-                          horizontal: spacing.xxs + 2,
-                          vertical: spacing.xxs / 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          borderRadius: radii.borderXs,
-                          border: Border.all(color: colors.statusNormal.withValues(alpha: 0.3)),
-                        ),
-                        child: Text(
-                          token,
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: colors.statusNormal,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Icon(
-                      Icons.signal_cellular_alt,
-                      size: 14,
-                      color: rssiInt >= -65
-                          ? colors.statusNormal
-                          : colors.statusAlerta,
-                    ),
-                    SizedBox(width: spacing.xxs / 2),
-                    Text(
-                      '$rssiInt dBm',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: rssiInt >= -65
-                            ? colors.statusNormal
-                            : colors.statusAlerta,
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: spacing.xxs / 2),
-                Container(
-                  padding: spacing.symmetric(
-                    horizontal: spacing.xxs + 2,
-                    vertical: spacing.xxs / 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.statusNormalContainer,
-                    borderRadius: radii.borderXs,
-                  ),
-                  child: Text(
-                    'BLE OK',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                      color: colors.onStatusNormalContainer,
-                    ),
-                  ),
+              ),
+            ),
+            if (hasBleIssue) ...[
+              const SizedBox(height: UiSpace.sm),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: UiSpace.page),
+                child: UiBanner(
+                  tone: UiBannerTone.warning,
+                  message: bleIssueMessage,
+                  actionLabel: _lastBleIssue?.type == BleRuntimeIssueType.adapterOff
+                      ? 'Encender Bluetooth'
+                      : (_lastBleIssue?.type == BleRuntimeIssueType.permission
+                          ? 'Abrir ajustes'
+                          : null),
+                  onAction: _lastBleIssue?.type == BleRuntimeIssueType.adapterOff
+                      ? () async {
+                          await _permissionService.turnOnBluetooth();
+                          await _reloadRecords();
+                        }
+                      : (_lastBleIssue?.type == BleRuntimeIssueType.permission
+                          ? () async {
+                              await _permissionService.openAppSettings();
+                            }
+                          : null),
+                ),
+              ),
+            ],
+            const SizedBox(height: UiSpace.md),
+            UiFilterPills<_AttendanceFilter>(
+              options: [
+                UiFilterOption(
+                  value: _AttendanceFilter.all,
+                  label: 'Todos $totalStudents',
+                ),
+                UiFilterOption(
+                  value: _AttendanceFilter.missing,
+                  label: 'Faltan $missingCount',
+                ),
+                UiFilterOption(
+                  value: _AttendanceFilter.present,
+                  label: 'Llegaron $presentCount',
                 ),
               ],
+              selected: _selectedFilter,
+              onSelected: (filter) => setState(() => _selectedFilter = filter),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Pestaña 2: Lista Invertida (1 Toque)
-  // ---------------------------------------------------------------------------
-
-  Widget _buildInvertedListTab(ThemeData theme) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-    final query = _searchQuery.trim().toLowerCase();
-
-    // Filtramos estudiantes según búsqueda rápida
-    final filtered = _students.where((StudentModel s) {
-      if (query.isEmpty) return true;
-      return s.fullName.toLowerCase().contains(query) ||
-          s.studentCode.contains(query);
-    }).toList(growable: false);
-
-    // Separamos en pendientes (arriba como pide el requerimiento) y confirmados (abajo)
-    final pending = filtered
-        .where((StudentModel s) => !_recordsByStudentId.containsKey(s.id))
-        .toList(growable: false);
-
-    final confirmed = filtered
-        .where((StudentModel s) => _recordsByStudentId.containsKey(s.id))
-        .toList(growable: false);
-
-    return ListView(
-      padding: spacing.insetsMd,
-      children: <Widget>[
-        // Mensaje descriptivo de la lista invertida
-        Container(
-          padding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xs),
-          decoration: BoxDecoration(
-            color: colors.manualAccentContainer.withValues(alpha: 0.35),
-            borderRadius: radii.borderSm,
-            border: Border.all(color: colors.manualAccent.withValues(alpha: 0.3)),
-          ),
-          child: Row(
-            children: <Widget>[
-              Icon(Icons.touch_app, size: 20, color: colors.manualAccent),
-              SizedBox(width: spacing.xs),
-              Expanded(
-                child: Text(
-                  'Marca a los alumnos sin celular o con batería descargada con un solo toque.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colors.onManualAccentContainer,
+            if (totalStudents > 12) ...[
+              const SizedBox(height: UiSpace.sm),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: UiSpace.page),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar estudiante',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
                   ),
                 ),
               ),
             ],
-          ),
-        ),
-        SizedBox(height: spacing.sm),
-
-        // Buscador Rápido por Nombre o Código
-        TextField(
-          controller: _searchController,
-          onChanged: (String value) => setState(() => _searchQuery = value),
-          decoration: InputDecoration(
-            hintText: 'Buscar por nombre o código...',
-            prefixIcon: const Icon(Icons.search, size: 20),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, size: 18),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _searchQuery = '');
-                    },
-                  )
-                : null,
-            isDense: true,
-            filled: true,
-            fillColor: colors.surfaceContainerHigh.withValues(alpha: 0.3),
-            border: OutlineInputBorder(
-              borderRadius: radii.borderSm,
-              borderSide: BorderSide(
-                color: colors.outlineVariant.withValues(alpha: 0.6),
-              ),
-            ),
-          ),
-        ),
-        SizedBox(height: spacing.md),
-
-        // SECCIÓN 1: PENDIENTES / SIN BLE (Muestra en la parte superior)
-        Row(
-          children: <Widget>[
-            Container(
-              padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs / 2),
-              decoration: BoxDecoration(
-                color: colors.statusPerdidaContainer,
-                borderRadius: radii.borderXs,
-              ),
-              child: Text(
-                'PENDIENTES (${pending.length})',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: colors.onStatusPerdidaContainer,
+            if (presentCount == 0 && totalStudents > 0) ...[
+              const SizedBox(height: UiSpace.sm),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: UiSpace.page),
+                child: UiBanner(
+                  tone: UiBannerTone.info,
+                  message:
+                      'Dicta el PIN y pide a tus estudiantes que acerquen el celular al tuyo.',
                 ),
               ),
-            ),
-            SizedBox(width: spacing.xs),
-            Text(
-              'No detectados por BLE',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colors.onSurfaceMuted,
+            ],
+            const SizedBox(height: UiSpace.sm),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: UiSpace.page),
+                child: Material(
+                  color: c.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(UiRadius.lg),
+                    side: BorderSide(color: c.line),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: _buildStudentList(context, displayedStudents),
+                ),
               ),
             ),
           ],
         ),
-        SizedBox(height: spacing.xs),
-
-        if (pending.isEmpty)
-          Container(
-            padding: spacing.insetsMd,
-            decoration: BoxDecoration(
-              color: colors.surfaceContainerLow,
-              borderRadius: radii.borderSm,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Icon(Icons.check_circle_outline, color: colors.statusNormal, size: 18),
-                SizedBox(width: spacing.xs),
-                Text(
-                  'No hay estudiantes pendientes en este grupo.',
-                  style: TextStyle(fontSize: 12, color: colors.onSurfaceMuted),
-                ),
-              ],
-            ),
-          )
-        else
-          ...pending.map((StudentModel student) {
-            return _buildPendingStudentTile(theme, student);
-          }),
-
-        SizedBox(height: spacing.lg),
-
-        // SECCIÓN 2: YA CONFIRMADOS (BLE O MANUAL)
-        Row(
-          children: <Widget>[
-            Container(
-              padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs / 2),
-              decoration: BoxDecoration(
-                color: colors.statusNormalContainer,
-                borderRadius: radii.borderXs,
-              ),
-              child: Text(
-                'REGISTRADOS (${confirmed.length})',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: colors.onStatusNormalContainer,
-                ),
-              ),
-            ),
-            SizedBox(width: spacing.xs),
-            Text(
-              'Presentes en el Bitmap',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colors.onSurfaceMuted,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: spacing.xs),
-
-        if (confirmed.isEmpty)
-          Padding(
-            padding: spacing.insetsSm,
-            child: Text(
-              'Aún no hay alumnos confirmados.',
-              style: TextStyle(fontSize: 12, color: colors.onSurfaceMuted),
-            ),
-          )
-        else
-          ...confirmed.map((StudentModel student) {
-            final record = _recordsByStudentId[student.id];
-            return _buildConfirmedStudentTile(theme, student, record);
-          }),
-      ],
-    );
-  }
-
-  Widget _buildPendingStudentTile(ThemeData theme, StudentModel student) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-    final bitPadded = student.bitIndex.toString().padLeft(2, '0');
-
-    return Card(
-      elevation: 0,
-      margin: spacing.only(bottom: spacing.xxs + 2),
-      shape: radii.cardShape(
-        side: BorderSide(
-          color: colors.outlineVariant.withValues(alpha: 0.6),
-        ),
-      ),
-      child: ListTile(
-        contentPadding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xxs / 2),
-        leading: Container(
-          width: 44,
-          height: 32,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: colors.surfaceContainerHigh,
-            borderRadius: radii.borderXs,
-          ),
-          child: Text(
-            '#$bitPadded',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontFamily: 'monospace',
-              fontSize: 12,
-            ),
-          ),
-        ),
-        title: Text(
-          student.fullName,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-        ),
-        subtitle: Text(
-          'Cód: ${student.studentCode}',
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 11,
-            color: colors.onSurfaceMuted,
-          ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            IconButton(
-              icon: const Icon(Icons.note_alt_outlined, size: 20),
-              tooltip: 'Agregar nota de excepción',
-              onPressed: () => _showObservationDialog(student),
-            ),
-            FilledButton.tonal(
-              onPressed: () => _handleToggleManual(student, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: colors.manualAccentContainer,
-                foregroundColor: colors.onManualAccentContainer,
-                padding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xs),
-                shape: radii.buttonShape(),
-              ),
-              child: const Text(
-                'Presente',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-            ),
-          ],
+        bottom: UiButton(
+          label: 'Cerrar y firmar la sesión',
+          loading: _isClosing,
+          onPressed: _isClosing ? null : _handleCloseAndSignSession,
         ),
       ),
     );
   }
 
-  Widget _buildConfirmedStudentTile(
-    ThemeData theme,
+  Widget _buildStudentList(
+    BuildContext context,
+    List<StudentModel> displayedStudents,
+  ) {
+    if (displayedStudents.isEmpty) {
+      if (_selectedFilter == _AttendanceFilter.missing) {
+        return const UiEmptyState(
+          title: 'Ya llegaron todos',
+          message: 'Todos los estudiantes de la clase están presentes.',
+          icon: Icons.check_circle_outline_rounded,
+        );
+      }
+      if (_selectedFilter == _AttendanceFilter.present) {
+        return const UiEmptyState(
+          title: 'Aún no llega nadie',
+          message: 'Los estudiantes aparecerán aquí cuando confirmen.',
+          icon: Icons.people_outline_rounded,
+        );
+      }
+      return const UiEmptyState(
+        title: 'Sin resultados',
+        message: 'No encontramos estudiantes con ese nombre o código.',
+        icon: Icons.search_off_rounded,
+      );
+    }
+
+    final c = _Palette.of(context);
+    return ListView.separated(
+      itemCount: displayedStudents.length,
+      separatorBuilder: (context, index) => Divider(
+        height: 1,
+        thickness: 1,
+        color: c.line,
+      ),
+      itemBuilder: (context, index) {
+        final student = displayedStudents[index];
+        final record = _recordsByStudentId[student.id];
+        return _buildStudentRow(context, student, record);
+      },
+    );
+  }
+
+  Widget _buildStudentRow(
+    BuildContext context,
     StudentModel student,
     AttendanceRecordModel? record,
   ) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-    final isBle = record?.method == AppConstants.attendanceMethodBleHmac;
-    final bitPadded = student.bitIndex.toString().padLeft(2, '0');
+    if (record == null) {
+      return UiPersonRow(
+        name: student.fullName,
+        subtitle: 'Aún no llega',
+        avatarTone: UiTone.neutral,
+        trailing: UiButton(
+          label: 'Marcar',
+          variant: UiButtonVariant.outline,
+          compact: true,
+          expand: false,
+          onPressed: () => _handleMarkStudent(student),
+        ),
+      );
+    }
 
-    return Card(
-      elevation: 0,
-      margin: spacing.only(bottom: spacing.xxs + 2),
-      shape: radii.cardShape(
-        side: BorderSide(
-          color: isBle
-              ? colors.statusNormal.withValues(alpha: 0.3)
-              : colors.manualAccent.withValues(alpha: 0.3),
-        ),
-      ),
-      color: isBle
-          ? colors.statusNormalContainer.withValues(alpha: 0.2)
-          : colors.manualAccentContainer.withValues(alpha: 0.2),
-      child: ListTile(
-        contentPadding: spacing.symmetric(horizontal: spacing.sm, vertical: spacing.xxs / 2),
-        leading: Container(
-          width: 44,
-          height: 32,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isBle ? colors.statusNormal : colors.manualAccent,
-            borderRadius: radii.borderXs,
-          ),
-          child: Text(
-            '#$bitPadded',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontFamily: 'monospace',
-              fontSize: 12,
-              color: colors.onPrimary,
-            ),
-          ),
-        ),
-        title: Text(
-          student.fullName,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-        ),
-        subtitle: Row(
-          children: <Widget>[
-            Text(
-              'Cód: ${student.studentCode}',
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
-            ),
-            SizedBox(width: spacing.xs),
-            Container(
-              padding: spacing.symmetric(horizontal: spacing.xxs + 2, vertical: spacing.xxs / 4),
-              decoration: BoxDecoration(
-                color: isBle ? colors.statusNormalContainer : colors.manualAccentContainer,
-                borderRadius: radii.borderXs,
-              ),
-              child: Text(
-                isBle ? 'BLE' : 'MANUAL',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  color: isBle ? colors.onStatusNormalContainer : colors.onManualAccentContainer,
-                ),
-              ),
-            ),
-            if (record?.observation != null) ...<Widget>[
-              SizedBox(width: spacing.xxs + 2),
-              Expanded(
-                child: Text(
-                  '(${record!.observation!})',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontStyle: FontStyle.italic,
-                    color: colors.onSurfaceMuted,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ],
-        ),
-        trailing: isBle
-            ? Icon(Icons.check_circle, color: colors.statusNormal, size: 22)
-            : OutlinedButton(
-                onPressed: () => _handleToggleManual(student, false),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: colors.statusPerdida,
-                  side: BorderSide(color: colors.statusPerdida.withValues(alpha: 0.4)),
-                  padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
-                  shape: radii.buttonShape(),
-                ),
-                child: const Text('Desmarcar', style: TextStyle(fontSize: 11)),
-              ),
-      ),
-    );
-  }
+    final recordedTime = DateTime.tryParse(record.recordedAt);
+    final timeStr = recordedTime != null ? UiFormat.time(recordedTime) : '';
 
-  // ---------------------------------------------------------------------------
-  // Barra Inferior con Botón de Cierre y Firma
-  // ---------------------------------------------------------------------------
+    if (record.method == AppConstants.attendanceMethodBleHmac) {
+      final isRecent = recordedTime != null &&
+          DateTime.now().difference(recordedTime).inSeconds.abs() < 10;
+      final subtitle = isRecent
+          ? 'Acaba de llegar · Bluetooth'
+          : (timeStr.isNotEmpty ? '$timeStr · Bluetooth' : 'Bluetooth');
 
-  Widget _buildBottomActionBar(ThemeData theme) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-
-    return Container(
-      padding: spacing.fromLTRB(spacing.md, spacing.sm, spacing.md, spacing.md),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: colors.onSurface.withValues(alpha: 0.05),
-            offset: const Offset(0, -2),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: _isClosing ? null : _handleCloseAndSignSession,
-            icon: _isClosing
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: colors.onPrimary,
-                    ),
-                  )
-                : const Icon(Icons.verified_outlined),
-            label: Text(
-              _isClosing
-                  ? 'Firmando Acta Criptográfica...'
-                  : 'Cerrar Sesión y Firmar Acta',
-            ),
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.primary,
-              foregroundColor: colors.onPrimary,
-              padding: spacing.insetsVMd,
-              shape: radii.buttonShape(),
-            ),
-          ),
+      return UiPersonRow(
+        name: student.fullName,
+        subtitle: subtitle,
+        avatarTone: UiTone.tint,
+        highlighted: isRecent,
+        trailing: UiStatusChip(
+          status: UiStatus.present,
+          solid: isRecent,
         ),
-      ),
+      );
+    }
+
+    // Marcado a mano
+    final note = record.observation;
+    final prefix = timeStr.isNotEmpty ? '$timeStr · ' : '';
+    final subtitle = (note != null && note.isNotEmpty)
+        ? '$prefix$note'
+        : '${prefix}A mano';
+
+    return UiPersonRow(
+      name: student.fullName,
+      subtitle: subtitle,
+      avatarTone: UiTone.manual,
+      trailing: const UiStatusChip(status: UiStatus.manual),
+      onTap: () => _showManualActionSheet(student),
     );
   }
 }
