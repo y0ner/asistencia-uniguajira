@@ -210,24 +210,25 @@ class _CoursesDashboardScreenState extends State<CoursesDashboardScreen> {
                 Text(
                   course.name,
                   style: UiText.title.copyWith(color: colors.ink),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
                   style: UiText.label.copyWith(color: colors.muted),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                // Bajo el nombre y no a la derecha: así el nombre no se corta.
+                if (!hasStudents) ...[
+                  const SizedBox(height: UiSpace.sm),
+                  const UiPill(label: 'Nueva', tone: UiTone.manual),
+                ],
               ],
             ),
           ),
           const SizedBox(width: UiSpace.sm),
-          if (!hasStudents) ...[
-            const UiPill(label: 'Nueva', tone: UiTone.manual),
-            const SizedBox(width: UiSpace.sm),
-          ],
           UiRoundIconButton(
             icon: Icons.more_horiz_rounded,
             tooltip: 'Opciones de la clase',

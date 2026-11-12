@@ -525,10 +525,11 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen> {
           ),
           const SizedBox(height: UiSpace.xs),
           Text(
-            res.failureMessage ??
-                (isBtOff
-                    ? 'Enciéndelo para registrar tu asistencia.'
-                    : 'Concede los permisos para registrar tu asistencia.'),
+            isBtOff
+                ? 'Enciéndelo para registrar tu asistencia.'
+                : res.requiresAppSettings
+                    ? 'Abre los ajustes y permite «Dispositivos cercanos» para registrar tu asistencia.'
+                    : 'Permite el acceso a «Dispositivos cercanos» para registrar tu asistencia.',
             style: UiText.label,
           ),
           const SizedBox(height: UiSpace.md),
