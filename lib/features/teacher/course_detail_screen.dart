@@ -311,7 +311,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 Expanded(
                   child: UiButton(
                     label: 'Estudiantes',
-                    icon: Icons.person_outline_rounded,
                     variant: UiButtonVariant.tonal,
                     onPressed: _openStudentsScreen,
                   ),
@@ -320,7 +319,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 Expanded(
                   child: UiButton(
                     label: 'Reportes',
-                    icon: Icons.bar_chart_rounded,
                     variant: UiButtonVariant.tonal,
                     onPressed: _openReportsScreen,
                   ),
