@@ -31,8 +31,8 @@ void main() {
 
         expect(find.byType(CoursesDashboardScreen), findsOneWidget);
         expect(find.byType(StudentCoursesScreen), findsNothing);
-        expect(find.text('Gestión de Cursos'), findsOneWidget);
-        expect(find.byIcon(Icons.bluetooth_searching), findsOneWidget);
+        expect(find.text('Asistencia'), findsOneWidget);
+        expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
       },
     );
 
@@ -57,7 +57,7 @@ void main() {
         await tester.pumpWidget(const AsistenciaApp(flavor: AppFlavor.docente));
         await tester.pump();
 
-        await tester.tap(find.byIcon(Icons.bluetooth_searching));
+        await tester.tap(find.byIcon(Icons.tune_rounded));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
