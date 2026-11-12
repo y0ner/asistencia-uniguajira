@@ -1,6 +1,9 @@
 import 'dart:io';
 
+import 'package:asistencia_uniguajira/core/constants/app_constants.dart';
+import 'package:asistencia_uniguajira/core/models/attendance_record_model.dart';
 import 'package:asistencia_uniguajira/core/models/course_model.dart';
+import 'package:asistencia_uniguajira/core/models/session_model.dart';
 import 'package:asistencia_uniguajira/core/models/student_model.dart';
 import 'package:asistencia_uniguajira/data/local/app_database.dart';
 import 'package:asistencia_uniguajira/features/teacher/course_detail_screen.dart';
@@ -146,7 +149,8 @@ void main() {
         expect(find.text('Agregar estudiantes'), findsOneWidget);
         expect(find.text('Tomar asistencia'), findsNothing);
         expect(find.widgetWithText(UiButton, 'Estudiantes'), findsOneWidget);
-        expect(find.widgetWithText(UiButton, 'Reportes'), findsOneWidget);
+        expect(find.widgetWithText(UiButton, 'Enviar Excel'), findsOneWidget);
+        expect(find.byTooltip('Opciones de la clase'), findsOneWidget);
       },
     );
 
@@ -168,30 +172,63 @@ void main() {
         );
         expect(find.text('Agregar estudiantes'), findsOneWidget);
         expect(find.text('Tomar asistencia'), findsNothing);
+        expect(find.widgetWithText(UiButton, 'Estudiantes'), findsOneWidget);
+        expect(find.widgetWithText(UiButton, 'Enviar Excel'), findsOneWidget);
+        expect(find.byTooltip('Opciones de la clase'), findsOneWidget);
       },
     );
   });
 
-  group('Detalle de clase - Con 2 estudiantes', () {
+  group('Detalle de clase - Con 2 estudiantes, 1 sesión cerrada y 1 abierta', () {
+    Future<void> seedScenario() async {
+      await database.insertStudent(_sampleStudent(
+        id: 'std-1',
+        courseId: course.id,
+        code: '0123456789',
+        name: 'Juan Pérez',
+        bitIndex: 0,
+      ));
+      await database.insertStudent(_sampleStudent(
+        id: 'std-2',
+        courseId: course.id,
+        code: '0987654321',
+        name: 'María Gómez',
+        bitIndex: 1,
+      ));
+
+      // Sesión 1: cerrada, sólo asistió Juan Pérez (1 de 2)
+      await database.insertSession(SessionModel(
+        id: 'ses-closed',
+        courseId: course.id,
+        startedAt: '2026-11-02T08:00:00.000-05:00',
+        roomPin: '41',
+      ));
+      await database.insertAttendanceRecord(AttendanceRecordModel(
+        id: 'rec-1',
+        sessionId: 'ses-closed',
+        studentId: 'std-1',
+        bitIndex: 0,
+        method: AppConstants.attendanceMethodBleHmac,
+        recordedAt: '2026-11-02T08:10:00.000-05:00',
+      ));
+      await database.closeSession(
+        sessionId: 'ses-closed',
+        closedAt: '2026-11-02T09:00:00.000-05:00',
+      );
+
+      // Sesión 2: abierta (en vivo)
+      await database.insertSession(const SessionModel(
+        id: 'ses-open',
+        courseId: 'course-bd2',
+        startedAt: '2026-11-09T08:00:00.000-05:00',
+        roomPin: '42',
+      ));
+    }
+
     testWidgets(
-      'muestra "Tomar asistencia", "Estudiantes", "Reportes" y al tocar "Estudiantes" aparecen los dos nombres (tema claro)',
+      'muestra "1 de 2", "En vivo", ficha "en riesgo", "Enviar Excel", y opciones con "Eliminar clase" y confirmación (tema claro)',
       (tester) async {
-        await tester.runAsync(() async {
-          await database.insertStudent(_sampleStudent(
-            id: 'std-1',
-            courseId: course.id,
-            code: '0123456789',
-            name: 'Juan Pérez',
-            bitIndex: 0,
-          ));
-          await database.insertStudent(_sampleStudent(
-            id: 'std-2',
-            courseId: course.id,
-            code: '0987654321',
-            name: 'María Gómez',
-            bitIndex: 1,
-          ));
-        });
+        await tester.runAsync(seedScenario);
 
         await _pumpScreen(
           tester,
@@ -202,45 +239,64 @@ void main() {
 
         expect(tester.takeException(), isNull);
         expect(find.byType(CourseDetailScreen), findsOneWidget);
-        expect(find.text('Tomar asistencia'), findsOneWidget);
-        expect(find.text('2 estudiantes'), findsOneWidget);
-        expect(find.widgetWithText(UiButton, 'Estudiantes'), findsOneWidget);
-        expect(find.widgetWithText(UiButton, 'Reportes'), findsOneWidget);
 
-        // Toca en "Estudiantes"
-        await tester.tap(find.widgetWithText(UiButton, 'Estudiantes'));
-        await tester.pump();
-        await _waitForDb(tester);
+        // Tarjeta principal indica volver a la sesión abierta y conteo de estudiantes
+        expect(find.text('Volver a la sesión'), findsOneWidget);
+        expect(find.text('2 estudiantes'), findsOneWidget);
+
+        // Fichas estadísticas (incluye la ficha en riesgo)
+        expect(find.text('en riesgo'), findsOneWidget);
+        expect(find.text('sesiones'), findsOneWidget);
+        expect(find.text('asistencia'), findsOneWidget);
+        expect(
+          find.byWidgetPredicate(
+            (w) => w is Semantics && w.properties.label == 'Ver reportes',
+          ),
+          findsOneWidget,
+        );
+
+        // Últimas sesiones: muestra "1 de 2" y "En vivo"
+        expect(find.text('1 de 2'), findsOneWidget);
+        expect(find.text('En vivo'), findsOneWidget);
+
+        // Botones inferiores
+        expect(find.widgetWithText(UiButton, 'Estudiantes'), findsOneWidget);
+        expect(find.widgetWithText(UiButton, 'Enviar Excel'), findsOneWidget);
+
+        // Opciones de la clase en la barra superior
+        final optionsButton = find.byTooltip('Opciones de la clase');
+        expect(optionsButton, findsOneWidget);
+        await tester.tap(optionsButton);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Agregar estudiantes'), findsOneWidget);
+        final deleteRow = find.text('Eliminar clase');
+        expect(deleteRow, findsOneWidget);
+
+        // Toca Eliminar clase para verificar el diálogo de confirmación
+        await tester.tap(deleteRow);
+        await tester.pumpAndSettle();
+
+        expect(find.text('¿Eliminar esta clase?'), findsOneWidget);
+        expect(
+          find.text('Se borran sus estudiantes y sus sesiones. No se puede deshacer.'),
+          findsOneWidget,
+        );
+        expect(find.widgetWithText(FilledButton, 'Eliminar'), findsOneWidget);
+        expect(find.widgetWithText(TextButton, 'Cancelar'), findsOneWidget);
+
+        // Cancela la eliminación para no alterar la pantalla
+        await tester.tap(find.widgetWithText(TextButton, 'Cancelar'));
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
-        expect(find.text('Juan Pérez'), findsOneWidget);
-        expect(find.text('María Gómez'), findsOneWidget);
-        expect(find.text('0123456789'), findsOneWidget);
-        expect(find.text('0987654321'), findsOneWidget);
-        expect(find.byTooltip('Código para unirse'), findsNWidgets(2));
       },
     );
 
     testWidgets(
-      'muestra "Tomar asistencia", "Estudiantes", "Reportes" y al tocar "Estudiantes" aparecen los dos nombres (tema oscuro)',
+      'muestra "1 de 2", "En vivo", ficha "en riesgo", "Enviar Excel", y opciones con "Eliminar clase" y confirmación (tema oscuro)',
       (tester) async {
-        await tester.runAsync(() async {
-          await database.insertStudent(_sampleStudent(
-            id: 'std-1',
-            courseId: course.id,
-            code: '0123456789',
-            name: 'Juan Pérez',
-            bitIndex: 0,
-          ));
-          await database.insertStudent(_sampleStudent(
-            id: 'std-2',
-            courseId: course.id,
-            code: '0987654321',
-            name: 'María Gómez',
-            bitIndex: 1,
-          ));
-        });
+        await tester.runAsync(seedScenario);
 
         await _pumpScreen(
           tester,
@@ -251,20 +307,39 @@ void main() {
 
         expect(tester.takeException(), isNull);
         expect(find.byType(CourseDetailScreen), findsOneWidget);
-        expect(find.text('Tomar asistencia'), findsOneWidget);
-        expect(find.text('2 estudiantes'), findsOneWidget);
-        expect(find.widgetWithText(UiButton, 'Estudiantes'), findsOneWidget);
-        expect(find.widgetWithText(UiButton, 'Reportes'), findsOneWidget);
 
-        // Toca en "Estudiantes"
-        await tester.tap(find.widgetWithText(UiButton, 'Estudiantes'));
-        await tester.pump();
-        await _waitForDb(tester);
+        // Tarjeta principal y conteos
+        expect(find.text('Volver a la sesión'), findsOneWidget);
+        expect(find.text('2 estudiantes'), findsOneWidget);
+
+        // Fichas y sesiones
+        expect(find.text('en riesgo'), findsOneWidget);
+        expect(find.text('1 de 2'), findsOneWidget);
+        expect(find.text('En vivo'), findsOneWidget);
+
+        // Botones inferiores
+        expect(find.widgetWithText(UiButton, 'Estudiantes'), findsOneWidget);
+        expect(find.widgetWithText(UiButton, 'Enviar Excel'), findsOneWidget);
+
+        // Opciones de la clase
+        await tester.tap(find.byTooltip('Opciones de la clase'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Eliminar clase'), findsOneWidget);
+        await tester.tap(find.text('Eliminar clase'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('¿Eliminar esta clase?'), findsOneWidget);
+        expect(
+          find.text('Se borran sus estudiantes y sus sesiones. No se puede deshacer.'),
+          findsOneWidget,
+        );
+        expect(find.widgetWithText(FilledButton, 'Eliminar'), findsOneWidget);
+
+        await tester.tap(find.widgetWithText(TextButton, 'Cancelar'));
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
-        expect(find.text('Juan Pérez'), findsOneWidget);
-        expect(find.text('María Gómez'), findsOneWidget);
       },
     );
   });

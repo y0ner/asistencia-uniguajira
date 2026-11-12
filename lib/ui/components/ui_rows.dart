@@ -174,7 +174,7 @@ class UiNavRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: UiText.bodyStrong.copyWith(color: c.ink),
                     ),
