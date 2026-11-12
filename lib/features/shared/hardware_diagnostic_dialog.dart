@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/platform/android_sdk.dart';
-import '../../theme/theme.dart';
+import '../../ui/ui.dart';
 
 /// Indica si el dispositivo Android ejecuta API 31 (Android 12) o superior.
 ///
@@ -76,24 +76,24 @@ class _HardwareDiagnosticDialogState extends State<HardwareDiagnosticDialog> {
     final permissions = <MapEntry<Permission, String>>[
       const MapEntry(
         Permission.bluetoothScan,
-        'Bluetooth Scan (Escaneo BLE en aula)',
+        'Buscar celulares cercanos',
       ),
       const MapEntry(
         Permission.bluetoothAdvertise,
-        'Bluetooth Advertise (Emisión Eco y Baliza)',
+        'Avisar a celulares cercanos',
       ),
       const MapEntry(
         Permission.bluetoothConnect,
-        'Bluetooth Connect (Conexión de proximidad BLE)',
+        'Conectar con celulares cercanos',
       ),
       if (!isAndroid12)
         const MapEntry(
           Permission.locationWhenInUse,
-          'Ubicación en uso (Requisito BLE en Android 11 o inferior)',
+          'Ubicación (solo en Android 11 o anterior)',
         ),
       const MapEntry(
         Permission.camera,
-        'Cámara (Escáner QR de enrolamiento)',
+        'Cámara (para leer el código de la clase)',
       ),
     ];
 
@@ -144,182 +144,80 @@ class _HardwareDiagnosticDialogState extends State<HardwareDiagnosticDialog> {
     }
   }
 
-  Widget _buildStatusChip(BuildContext context, PermissionStatus? status) {
-    if (status == null) {
-      return const SizedBox.shrink();
-    }
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-
+  Widget _buildStatusChip(PermissionStatus? status) {
+    if (status == null) return const SizedBox.shrink();
     if (status.isGranted) {
-      return Container(
-        padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
-        decoration: BoxDecoration(
-          color: colors.statusNormalContainer,
-          borderRadius: radii.borderXs,
-        ),
-        child: Text(
-          'Concedido',
-          style: TextStyle(
-            color: colors.onStatusNormalContainer,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
+      return const UiPill(label: 'Permitido', icon: Icons.check_rounded);
     }
     if (status.isPermanentlyDenied) {
-      return Container(
-        padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
-        decoration: BoxDecoration(
-          color: colors.statusPerdidaContainer,
-          borderRadius: radii.borderXs,
-        ),
-        child: Text(
-          'Bloqueado',
-          style: TextStyle(
-            color: colors.onStatusPerdidaContainer,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
+      return const UiPill(label: 'Bloqueado', icon: Icons.block_rounded, tone: UiTone.absent);
     }
-    return Container(
-      padding: spacing.symmetric(horizontal: spacing.xs, vertical: spacing.xxs),
-      decoration: BoxDecoration(
-        color: colors.statusAlertaContainer,
-        borderRadius: radii.borderXs,
-      ),
-      child: Text(
-        'Denegado',
-        style: TextStyle(
-          color: colors.onStatusAlertaContainer,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
+    return const UiPill(label: 'Falta', icon: Icons.warning_amber_rounded, tone: UiTone.manual);
   }
 
   @override
   Widget build(BuildContext context) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
+    final c = UiColors.of(context);
+    final allGranted = !_isLoading &&
+        _permissions.every((e) => _statuses[e.key]?.isGranted ?? false);
+    final anyBlocked = _statuses.values.any((s) => s.isPermanentlyDenied);
 
     return AlertDialog(
-      shape: radii.dialogShape(),
-      title: Row(
-        children: <Widget>[
-          Icon(Icons.build_circle_rounded, color: colors.primary, size: 26),
-          SizedBox(width: spacing.xs),
-          const Expanded(
-            child: Text(
-              'Diagnóstico de Permisos Hardware',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-            ),
-          ),
-        ],
-      ),
+      title: const Text('Permisos del celular'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Text(
-              'Estado de los canales de hardware necesarios para proximidad BLE y escaneo QR en dispositivos Android:',
-              style: TextStyle(fontSize: 12.5, color: colors.onSurfaceMuted),
+              'La app usa el Bluetooth para tomar asistencia de cerca y la cámara para unirte a una clase.',
+              style: UiText.label.copyWith(color: c.muted),
             ),
-            SizedBox(height: spacing.sm),
+            const SizedBox(height: UiSpace.md),
             if (_isLoading)
-              Center(
-                child: Padding(
-                  padding: spacing.insetsLg,
-                  child: const CircularProgressIndicator(),
-                ),
+              const Padding(
+                padding: EdgeInsets.all(UiSpace.xl),
+                child: Center(child: CircularProgressIndicator()),
               )
             else
-              ..._permissions.map((entry) {
-                final status = _statuses[entry.key];
-                return Padding(
-                  padding: spacing.only(bottom: spacing.xs),
-                  child: Container(
-                    padding: spacing.insetsSm,
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerLow,
-                      borderRadius: radii.borderSm,
-                      border: Border.all(color: colors.outlineVariant),
-                    ),
-                    child: Row(
-                      children: <Widget>[
-                        Icon(
-                          status?.isGranted ?? false
-                              ? Icons.check_circle_rounded
-                              : Icons.warning_amber_rounded,
-                          color: status?.isGranted ?? false
-                              ? colors.statusNormal
-                              : colors.statusAlerta,
-                          size: 20,
-                        ),
-                        SizedBox(width: spacing.xs),
-                        Expanded(
-                          child: Text(
-                            entry.value,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                            ),
+              UiListGroup(
+                children: <Widget>[
+                  for (final entry in _permissions)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: UiSpace.md, vertical: UiSpace.md),
+                      child: Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(entry.value, style: UiText.bodyStrong.copyWith(color: c.ink)),
                           ),
-                        ),
-                        SizedBox(width: spacing.xxs),
-                        _buildStatusChip(context, status),
-                      ],
+                          const SizedBox(width: UiSpace.sm),
+                          _buildStatusChip(_statuses[entry.key]),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              }),
-            SizedBox(height: spacing.sm),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colors.primary,
-                      padding: spacing.symmetric(vertical: spacing.sm),
-                      shape: radii.buttonShape(),
-                    ),
-                    icon: const Icon(Icons.security_update_good_rounded, size: 18),
-                    label: const Text(
-                      'Solicitar Permisos',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
-                    ),
-                    onPressed: _isLoading ? null : _requestPermissions,
-                  ),
-                ),
-                SizedBox(width: spacing.xs),
-                IconButton(
-                  tooltip: 'Reverificar permisos',
-                  icon: Icon(Icons.refresh_rounded, color: colors.primary),
-                  onPressed: _isLoading ? null : _initAndCheckPermissions,
-                ),
-              ],
-            ),
-            SizedBox(height: spacing.xs),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: colors.primary,
-                padding: spacing.symmetric(vertical: spacing.sm),
-                shape: radii.buttonShape(),
+                ],
               ),
-              icon: const Icon(Icons.settings_outlined, size: 18),
-              label: const Text(
-                'Abrir Ajustes del Sistema',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+            const SizedBox(height: UiSpace.md),
+            if (allGranted)
+              const UiBanner(tone: UiBannerTone.info, message: 'Todo listo: la app tiene los permisos que necesita.')
+            else ...<Widget>[
+              UiButton(
+                label: anyBlocked ? 'Abrir ajustes' : 'Dar permisos',
+                compact: true,
+                onPressed: _isLoading
+                    ? null
+                    : anyBlocked
+                        ? () => openAppSettings()
+                        : _requestPermissions,
               ),
-              onPressed: () => openAppSettings(),
-            ),
+              const SizedBox(height: UiSpace.sm),
+              UiButton(
+                label: 'Volver a revisar',
+                variant: UiButtonVariant.outline,
+                compact: true,
+                onPressed: _isLoading ? null : _initAndCheckPermissions,
+              ),
+            ],
           ],
         ),
       ),
@@ -339,72 +237,12 @@ class DesktopHardwareDiagnosticDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-
+    final c = UiColors.of(context);
     return AlertDialog(
-      shape: radii.dialogShape(),
-      title: Row(
-        children: <Widget>[
-          Icon(Icons.desktop_windows_rounded, color: colors.primary, size: 26),
-          SizedBox(width: spacing.xs),
-          const Expanded(
-            child: Text(
-              'Diagnóstico de Permisos Hardware',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-            ),
-          ),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Container(
-              padding: spacing.insetsSm,
-              decoration: BoxDecoration(
-                color: colors.statusNormalContainer,
-                borderRadius: radii.borderSm,
-                border: Border.all(color: colors.statusNormal.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: <Widget>[
-                  Icon(
-                    Icons.check_circle_rounded,
-                    color: colors.statusNormal,
-                    size: 22,
-                  ),
-                  SizedBox(width: spacing.xs),
-                  Expanded(
-                    child: Text(
-                      'Entorno Linux Desktop / Prueba FFI Detectado — Simulación BLE Activa',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: colors.onStatusNormalContainer,
-                        fontSize: 12.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: spacing.sm),
-            Text(
-              'La aplicación está ejecutándose en un entorno de pruebas o escritorio Linux sin acceso a los servicios nativos de Android:\n\n'
-              '• Persistencia SQLite v3: Operativa mediante driver C nativo (sqflite_common_ffi).\n'
-              '• Motor Criptográfico: Generación determinista HMAC-SHA256 validada al 100%.\n'
-              '• Simulación BLE y Cámara: Los canales dependientes de plataforma se omiten para garantizar estabilidad sin excepciones MissingPluginException.\n\n'
-              'En dispositivos móviles Android físicos, este panel valida y solicita en tiempo de ejecución los permisos Bluetooth y Cámara (y ubicación únicamente en Android 11 o inferior).',
-              style: TextStyle(
-                fontSize: 12.5,
-                height: 1.45,
-                color: colors.onSurfaceMuted,
-              ),
-            ),
-          ],
-        ),
+      title: const Text('Permisos del celular'),
+      content: Text(
+        'Estás usando la app en un computador. El Bluetooth y la cámara solo funcionan en un celular Android: ahí este panel revisa y pide los permisos.',
+        style: UiText.body.copyWith(color: c.muted),
       ),
       actions: <Widget>[
         TextButton(

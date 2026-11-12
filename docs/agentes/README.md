@@ -36,4 +36,4 @@ Reglas comunes: `docs/agentes/briefs/D1-comun.md`.
 | D2-C | Docente · Reportes y sesión firmada | `course_reports_screen.dart`, `signed_acta_dialog.dart` |
 
 Las pantallas no comparten archivos: cada oleada corre en paralelo. Al terminar
-la D2 se borra `lib/theme` y las extensiones heredadas de `UiTheme`.
+la D2 se borró `lib/theme` (12 de noviembre de 2026).

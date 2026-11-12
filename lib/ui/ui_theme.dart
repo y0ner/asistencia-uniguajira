@@ -1,21 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../theme/theme.dart';
 import 'tokens/ui_colors.dart';
 import 'tokens/ui_metrics.dart';
 import 'tokens/ui_text.dart';
 
 /// Tema de la app (versión B del rediseño).
-///
-/// Mientras dura la migración también registra las extensiones del tema
-/// anterior (`lib/theme`), para que las pantallas aún no migradas sigan
-/// funcionando. Se quitan cuando no quede ninguna.
 abstract final class UiTheme {
-  static ThemeData light() => _build(Brightness.light, UiColors.light, lightAppColors);
+  static ThemeData light() => _build(Brightness.light, UiColors.light);
 
-  static ThemeData dark() => _build(Brightness.dark, UiColors.dark, darkAppColors);
+  static ThemeData dark() => _build(Brightness.dark, UiColors.dark);
 
-  static ThemeData _build(Brightness brightness, UiColors c, AppColors legacy) {
+  static ThemeData _build(Brightness brightness, UiColors c) {
     final scheme = ColorScheme(
       brightness: brightness,
       primary: c.primary,
@@ -175,7 +170,7 @@ abstract final class UiTheme {
         ),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(color: c.primary, linearTrackColor: c.line),
-      extensions: [c, legacy, defaultAppSpacing, defaultAppRadii, defaultAppMotion],
+      extensions: [c],
     );
   }
 }

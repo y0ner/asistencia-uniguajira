@@ -3,7 +3,7 @@ import 'package:asistencia_uniguajira/app/asistencia_app.dart';
 import 'package:asistencia_uniguajira/features/shared/hardware_diagnostic_dialog.dart';
 import 'package:asistencia_uniguajira/features/student/student_courses_screen.dart';
 import 'package:asistencia_uniguajira/features/teacher/courses_dashboard_screen.dart';
-import 'package:asistencia_uniguajira/theme/theme.dart';
+import 'package:asistencia_uniguajira/ui/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -62,7 +62,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.byType(DesktopHardwareDiagnosticDialog), findsOneWidget);
-        expect(find.text('Diagnóstico de Permisos Hardware'), findsOneWidget);
+        expect(find.text('Permisos del celular'), findsOneWidget);
         expect(find.text('Entendido'), findsOneWidget);
 
         await tester.tap(find.text('Entendido'));
@@ -79,7 +79,7 @@ void main() {
       (WidgetTester tester) async {
         await tester.pumpWidget(
           MaterialApp(
-            theme: AppTheme.buildLightTheme(),
+            theme: UiTheme.light(),
             home: Scaffold(
               body: HardwareDiagnosticDialog(
                 isAndroid12OrHigherOverride: true,
@@ -91,11 +91,11 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        expect(find.textContaining('Bluetooth Scan'), findsOneWidget);
-        expect(find.textContaining('Bluetooth Advertise'), findsOneWidget);
-        expect(find.textContaining('Bluetooth Connect'), findsOneWidget);
-        expect(find.textContaining('Cámara'), findsOneWidget);
-        expect(find.textContaining('Ubicación en uso'), findsNothing);
+        expect(find.text('Buscar celulares cercanos'), findsOneWidget);
+        expect(find.text('Avisar a celulares cercanos'), findsOneWidget);
+        expect(find.text('Conectar con celulares cercanos'), findsOneWidget);
+        expect(find.textContaining('Cámara ('), findsOneWidget);
+        expect(find.textContaining('Ubicación'), findsNothing);
       },
     );
 
@@ -104,7 +104,7 @@ void main() {
       (WidgetTester tester) async {
         await tester.pumpWidget(
           MaterialApp(
-            theme: AppTheme.buildLightTheme(),
+            theme: UiTheme.light(),
             home: Scaffold(
               body: HardwareDiagnosticDialog(
                 isAndroid12OrHigherOverride: false,
@@ -116,11 +116,11 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        expect(find.textContaining('Bluetooth Scan'), findsOneWidget);
-        expect(find.textContaining('Bluetooth Advertise'), findsOneWidget);
-        expect(find.textContaining('Bluetooth Connect'), findsOneWidget);
-        expect(find.textContaining('Cámara'), findsOneWidget);
-        expect(find.textContaining('Ubicación en uso'), findsOneWidget);
+        expect(find.text('Buscar celulares cercanos'), findsOneWidget);
+        expect(find.text('Avisar a celulares cercanos'), findsOneWidget);
+        expect(find.text('Conectar con celulares cercanos'), findsOneWidget);
+        expect(find.textContaining('Cámara ('), findsOneWidget);
+        expect(find.textContaining('Ubicación'), findsOneWidget);
       },
     );
   });
