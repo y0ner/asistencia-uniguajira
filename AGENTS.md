@@ -59,7 +59,7 @@ trabajo y se pregunta al agente jefe.
    su prueba en `test/`.
 7. **Diseño:** toda pantalla se construye con el sistema de diseño de
    `lib/ui` siguiendo `docs/diseno/SISTEMA.md`. Nada de colores, tamaños de
-   letra ni medidas sueltas, y nada de `lib/theme` en pantallas migradas.
+   letra ni medidas sueltas.
 8. **Idioma:** comentarios, mensajes al usuario y commits en español.
 
 ### Alcance prohibido (no se implementa nunca)
