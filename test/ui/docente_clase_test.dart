@@ -11,6 +11,7 @@ import 'package:asistencia_uniguajira/ui/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 Future<void> _loadFigtree() async {
@@ -342,5 +343,43 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  });
+
+  testWidgets('el código para unirse de un estudiante se abre sin errores', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await database.insertStudent(
+        _sampleStudent(
+          id: 'qr-1',
+          courseId: course.id,
+          code: '0182120016',
+          name: 'YONER DE JESUS ISAZA VIDES',
+          bitIndex: 0,
+        ),
+      );
+    });
+    // Mismo tamaño y letra que el celular donde apareció el error (Xiaomi, 384 × 853).
+    await _pumpScreen(
+      tester,
+      theme: UiTheme.dark(),
+      course: course,
+      database: database,
+      size: const Size(384, 853),
+      textScale: 1.0,
+    );
+
+    await tester.tap(find.widgetWithText(UiButton, 'Estudiantes'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await _waitForDb(tester);
+    // Esperar a que termine la animación de entrada de la pantalla.
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.byIcon(Icons.qr_code_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(QrImageView), findsOneWidget);
+    expect(find.text('YONER DE JESUS ISAZA VIDES'), findsWidgets);
   });
 }
