@@ -398,6 +398,7 @@ class _StudentLiveBeaconScreenState extends State<StudentLiveBeaconScreen> {
       child: UiPage(
         header: UiTopBar(
           title: widget.enrollment.courseName,
+          titleMaxLines: 1,
           onBack: () {
             if (_phase == StudentBeaconPhase.broadcasting) {
               _cancelBroadcasting();

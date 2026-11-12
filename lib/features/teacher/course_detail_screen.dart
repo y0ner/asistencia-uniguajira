@@ -5,6 +5,7 @@ import '../../core/models/course_model.dart';
 import '../../core/models/session_model.dart';
 import '../../core/models/student_model.dart';
 import '../../data/local/app_database.dart';
+import '../../data/services/course_overview_service.dart';
 import '../../data/services/roster_import_service.dart';
 import '../../ui/ui.dart';
 import 'course_reports_screen.dart';
@@ -15,20 +16,22 @@ import 'signed_acta_dialog.dart';
 /// Detalle de la clase seleccionada por el docente:
 /// - Hero card para tomar asistencia o volver a la sesión activa.
 /// - Banner informativo cuando no hay estudiantes en la clase.
-/// - Métricas de la clase (sesiones y estudiantes).
-/// - Historial de últimas sesiones con navegación al acta firmada.
-/// - Acceso directo a la gestión de estudiantes y reportes.
+/// - Métricas consolidadas (sesiones, asistencia, en riesgo) con acceso a Reportes.
+/// - Historial de últimas sesiones con navegación al acta firmada o sesión en vivo.
+/// - Acceso directo a la gestión de estudiantes y exportación del Excel oficial.
 class CourseDetailScreen extends StatefulWidget {
   const CourseDetailScreen({
     super.key,
     required this.course,
     this.database,
     this.rosterService,
+    this.overviewService,
   });
 
   final CourseModel course;
   final AppDatabase? database;
   final RosterImportService? rosterService;
+  final CourseOverviewService? overviewService;
 
   @override
   State<CourseDetailScreen> createState() => _CourseDetailScreenState();
@@ -37,29 +40,28 @@ class CourseDetailScreen extends StatefulWidget {
 class _CourseDetailScreenState extends State<CourseDetailScreen> {
   late final AppDatabase _database;
   late final RosterImportService _rosterService;
+  late final CourseOverviewService _overviewService;
 
   bool _isLoading = true;
-  List<StudentModel> _students = <StudentModel>[];
-  List<SessionModel> _sessions = <SessionModel>[];
+  CourseOverview? _overview;
 
   @override
   void initState() {
     super.initState();
     _database = widget.database ?? AppDatabase.instance;
     _rosterService = widget.rosterService ?? RosterImportService();
+    _overviewService = widget.overviewService ??
+        CourseOverviewService(database: _database);
     _loadData();
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final list = await _database.getStudentsByCourse(widget.course.id);
-      final sessionList =
-          await _database.getSessionsByCourse(widget.course.id);
+      final overview = await _overviewService.load(widget.course.id);
       if (mounted) {
         setState(() {
-          _students = list;
-          _sessions = sessionList;
+          _overview = overview;
           _isLoading = false;
         });
       }
@@ -79,7 +81,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Future<void> _onStartBleSession() async {
-    final result = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (BuildContext context) => LiveAttendanceSessionScreen(
           course: widget.course,
@@ -87,18 +89,18 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         ),
       ),
     );
-    if (!mounted) return;
-    if (result == true) {
+    if (mounted) {
       await _loadData();
     }
   }
 
-  Future<void> _openReportsScreen() async {
+  Future<void> _openReportsScreen({bool exportOnOpen = false}) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => CourseReportsScreen(
           course: widget.course,
           database: _database,
+          exportOnOpen: exportOnOpen,
         ),
       ),
     );
@@ -114,12 +116,91 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           course: widget.course,
           database: _database,
           rosterService: _rosterService,
-          initialStudents: _students,
         ),
       ),
     );
     if (mounted) {
       await _loadData();
+    }
+  }
+
+  Future<void> _showCourseOptionsSheet() async {
+    final c = UiColors.of(context);
+    await showUiSheet<void>(
+      context,
+      builder: (sheetContext) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: UiSpace.sm),
+            UiNavRow(
+              title: 'Agregar estudiantes',
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _openImportModal();
+              },
+            ),
+            Theme(
+              data: Theme.of(sheetContext).copyWith(
+                extensions: <ThemeExtension<dynamic>>[
+                  UiColors(
+                    background: c.background,
+                    surface: c.surface,
+                    ink: c.absentText,
+                    muted: c.muted,
+                    line: c.line,
+                    primary: c.primary,
+                    onPrimary: c.onPrimary,
+                    primaryText: c.primaryText,
+                    veil: c.veil,
+                    tint: c.tint,
+                    tintText: c.tintText,
+                    manualBg: c.manualBg,
+                    manualText: c.manualText,
+                    absentBg: c.absentBg,
+                    absentText: c.absentText,
+                    presentDot: c.presentDot,
+                    manualDot: c.manualDot,
+                    absentDot: c.absentDot,
+                  ),
+                ],
+              ),
+              child: UiNavRow(
+                title: 'Eliminar clase',
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _confirmDeleteCourse();
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDeleteCourse() async {
+    final confirmed = await showUiConfirm(
+      context,
+      destructive: true,
+      title: '¿Eliminar esta clase?',
+      message:
+          'Se borran sus estudiantes y sus sesiones. No se puede deshacer.',
+      confirmLabel: 'Eliminar',
+    );
+
+    if (confirmed == true) {
+      try {
+        await _database.deleteCourse(widget.course.id);
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+      } catch (e) {
+        if (mounted) {
+          showUiSnack(context, 'No se pudo eliminar la clase.');
+        }
+      }
     }
   }
 
@@ -142,38 +223,30 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     }
   }
 
-  int _countAttended(String bitmapHex) {
-    final value = BigInt.tryParse(bitmapHex, radix: 16);
-    if (value == null) return 0;
-    var count = 0;
-    var temp = value;
-    while (temp > BigInt.zero) {
-      if ((temp & BigInt.one) == BigInt.one) {
-        count++;
-      }
-      temp = temp >> 1;
-    }
-    return count;
-  }
-
-  String _formatSessionDate(String startedAt) {
-    final dt = DateTime.tryParse(startedAt);
-    if (dt != null) {
-      return UiFormat.longDate(dt.toLocal());
-    }
-    return startedAt;
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = UiColors.of(context);
-    final hasStudents = _students.isNotEmpty;
-    final hasOpenSession = _sessions.any((s) => s.closedAt == null);
+    final overview = _overview;
 
     final Widget body;
     if (_isLoading) {
       body = const Center(child: CircularProgressIndicator());
+    } else if (overview == null) {
+      body = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(UiSpace.page),
+          child: UiBanner(
+            tone: UiBannerTone.error,
+            message: 'No se pudieron cargar los datos de la clase.',
+            actionLabel: 'Reintentar',
+            onAction: _loadData,
+          ),
+        ),
+      );
     } else {
+      final hasStudents = overview.hasStudents;
+      final hasOpenSession = overview.openSession != null;
+
       body = RefreshIndicator(
         onRefresh: _loadData,
         child: ListView(
@@ -205,7 +278,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                                 const SizedBox(height: UiSpace.xs),
                                 Text(
                                   UiFormat.count(
-                                    _students.length,
+                                    overview.studentCount,
                                     'estudiante',
                                     'estudiantes',
                                   ),
@@ -247,45 +320,86 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 UiSpace.page,
                 0,
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: UiStatTile(
-                      value: '${_sessions.length}',
-                      label: 'sesiones',
-                    ),
+              child: Semantics(
+                button: true,
+                label: 'Ver reportes',
+                child: InkWell(
+                  onTap: () => _openReportsScreen(),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: UiStatTile(
+                          value: '${overview.closedSessionCount}',
+                          label: 'sesiones',
+                        ),
+                      ),
+                      const SizedBox(width: UiSpace.sm),
+                      Expanded(
+                        child: UiStatTile(
+                          value: overview.attendancePercent != null
+                              ? '${overview.attendancePercent!.round()} %'
+                              : '—',
+                          label: 'asistencia',
+                        ),
+                      ),
+                      const SizedBox(width: UiSpace.sm),
+                      Expanded(
+                        child: UiStatTile(
+                          value: '${overview.atRiskCount}',
+                          label: 'en riesgo',
+                          tone: overview.atRiskCount > 0 ? UiTone.absent : null,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: UiSpace.sm),
-                  Expanded(
-                    child: UiStatTile(
-                      value: '${_students.length}',
-                      label: 'estudiantes',
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
             const UiSectionTitle('Últimas sesiones'),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: UiSpace.page),
-              child: _sessions.isEmpty
+              child: overview.recentSessions.isEmpty
                   ? Text(
                       'Aún no has tomado asistencia en esta clase.',
                       style: UiText.body.copyWith(color: c.muted),
                     )
                   : UiListGroup(
                       children: [
-                        for (final session in _sessions)
+                        for (final row in overview.recentSessions)
                           UiNavRow(
-                            title: _formatSessionDate(session.startedAt),
-                            subtitle: session.closedAt == null
-                                ? 'Sesión abierta'
-                                : 'Llegaron ${_countAttended(session.bitmapHex)} de ${_students.length}',
+                            title: UiFormat.longDate(
+                              DateTime.tryParse(row.session.startedAt)
+                                      ?.toLocal() ??
+                                  DateTime.now(),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${row.presentCount} de ${row.totalStudents}',
+                                  style: UiText.label.copyWith(color: c.muted),
+                                ),
+                                const SizedBox(width: UiSpace.sm),
+                                if (row.isOpen)
+                                  const UiPill(label: 'En vivo', dot: true)
+                                else
+                                  SizedBox(
+                                    width: 52,
+                                    child: UiProgressBar(
+                                      value: row.ratio,
+                                      height: 6,
+                                      semanticLabel:
+                                          '${(row.ratio * 100).round()} por ciento',
+                                    ),
+                                  ),
+                              ],
+                            ),
                             onTap: () {
-                              if (session.closedAt != null) {
-                                _viewSessionActa(session);
-                              } else {
+                              if (row.isOpen) {
                                 _onStartBleSession();
+                              } else {
+                                _viewSessionActa(row.session);
                               }
                             },
                           ),
@@ -303,27 +417,61 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         subtitle:
             '${widget.course.code} · Grupo ${widget.course.groupCode} · ${widget.course.semester}',
         onBack: () => Navigator.of(context).pop(),
+        trailing: UiRoundIconButton(
+          icon: Icons.more_horiz_rounded,
+          tooltip: 'Opciones de la clase',
+          onPressed: _showCourseOptionsSheet,
+        ),
       ),
-      bottom: _isLoading
+      bottom: _isLoading || overview == null
           ? null
-          : Row(
-              children: [
-                Expanded(
-                  child: UiButton(
-                    label: 'Estudiantes',
-                    variant: UiButtonVariant.tonal,
-                    onPressed: _openStudentsScreen,
-                  ),
-                ),
-                const SizedBox(width: UiSpace.sm),
-                Expanded(
-                  child: UiButton(
-                    label: 'Reportes',
-                    variant: UiButtonVariant.tonal,
-                    onPressed: _openReportsScreen,
-                  ),
-                ),
-              ],
+          : LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) {
+                final scale = MediaQuery.textScalerOf(context).scale(1.0);
+                final stackVertical =
+                    scale > 1.15 || constraints.maxWidth < 290;
+                if (stackVertical) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      UiButton(
+                        label: 'Estudiantes',
+                        variant: UiButtonVariant.tonal,
+                        icon: Icons.person_outline_rounded,
+                        onPressed: _openStudentsScreen,
+                      ),
+                      const SizedBox(height: UiSpace.sm),
+                      UiButton(
+                        label: 'Enviar Excel',
+                        variant: UiButtonVariant.tonal,
+                        icon: Icons.ios_share_rounded,
+                        onPressed: () => _openReportsScreen(exportOnOpen: true),
+                      ),
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(
+                      child: UiButton(
+                        label: 'Estudiantes',
+                        variant: UiButtonVariant.tonal,
+                        icon: Icons.person_outline_rounded,
+                        onPressed: _openStudentsScreen,
+                      ),
+                    ),
+                    const SizedBox(width: UiSpace.sm),
+                    Expanded(
+                      child: UiButton(
+                        label: 'Enviar Excel',
+                        variant: UiButtonVariant.tonal,
+                        icon: Icons.ios_share_rounded,
+                        onPressed: () => _openReportsScreen(exportOnOpen: true),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
       body: body,
     );
@@ -336,33 +484,24 @@ class _CourseStudentsScreen extends StatefulWidget {
     required this.course,
     required this.database,
     required this.rosterService,
-    this.initialStudents,
   });
 
   final CourseModel course;
   final AppDatabase database;
   final RosterImportService rosterService;
-  final List<StudentModel>? initialStudents;
 
   @override
   State<_CourseStudentsScreen> createState() => _CourseStudentsScreenState();
 }
 
 class _CourseStudentsScreenState extends State<_CourseStudentsScreen> {
-  late bool _isLoading;
-  late List<StudentModel> _students;
+  bool _isLoading = true;
+  List<StudentModel> _students = <StudentModel>[];
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialStudents != null) {
-      _isLoading = false;
-      _students = List<StudentModel>.from(widget.initialStudents!);
-    } else {
-      _isLoading = true;
-      _students = <StudentModel>[];
-      _loadStudents();
-    }
+    _loadStudents();
   }
 
   Future<void> _loadStudents() async {

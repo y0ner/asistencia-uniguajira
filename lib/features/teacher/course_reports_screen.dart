@@ -27,6 +27,7 @@ class CourseReportsScreen extends StatefulWidget {
     this.excelService,
     this.cloudSyncService,
     this.reportShareService,
+    this.exportOnOpen = false,
   });
 
   /// Curso institucional objeto del reporte.
@@ -43,6 +44,9 @@ class CourseReportsScreen extends StatefulWidget {
 
   /// Servicio para compartir reportes institucionales opcional.
   final ReportShareService? reportShareService;
+
+  /// Si es verdadero, al terminar de cargar los datos exporta el libro oficial una vez.
+  final bool exportOnOpen;
 
   /// Despliega el diálogo de exportación exitosa con las acciones requeridas:
   /// "Compartir" (principal) y "Cerrar".
@@ -101,6 +105,7 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
   bool _isLoading = true;
   bool _isExporting = false;
   bool _isSharing = false;
+  bool _hasExportedOnOpen = false;
   String? _loadError;
   String? _latestExportedFilePath;
 
@@ -137,6 +142,14 @@ class _CourseReportsScreenState extends State<CourseReportsScreen> {
           _isLoading = false;
         });
         await _checkLatestExportedFile();
+        if (widget.exportOnOpen && !_hasExportedOnOpen) {
+          _hasExportedOnOpen = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _exportOfficialExcelWorkbook();
+            }
+          });
+        }
       }
     } catch (e) {
       if (mounted) {

@@ -105,9 +105,14 @@ class UiTopBar extends StatelessWidget {
     this.backTooltip,
     this.trailing,
     this.below,
+    this.titleMaxLines = 2,
   });
 
   final String title;
+
+  /// Líneas del título. Usa 1 en pantallas que necesitan todo el alto
+  /// (p. ej. el teclado del PIN).
+  final int titleMaxLines;
   final String? subtitle;
 
   /// Si es nulo, no se muestra el botón de volver.
@@ -142,14 +147,14 @@ class UiTopBar extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  maxLines: 1,
+                  maxLines: titleMaxLines,
                   overflow: TextOverflow.ellipsis,
                   style: UiText.h2.copyWith(color: c.ink),
                 ),
                 if (subtitle != null)
                   Text(
                     subtitle!,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: UiText.label.copyWith(color: c.muted),
                   ),
