@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ícono "Tejido": rectángulos del tejido del escudo y un chulo. Versión monocromática (Android 13+). Lienzo adaptativo de 108 dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M42,33 H66 A9,9 0 0 1 75,42 V66 A9,9 0 0 1 66,75 H42 A9,9 0 0 1 33,66 V42 A9,9 0 0 1 42,33 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path android:pathData="M43,58 L51,66 L68,46"
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="7"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

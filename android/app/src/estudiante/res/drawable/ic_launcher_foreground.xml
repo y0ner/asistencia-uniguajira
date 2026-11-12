@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ícono "Tejido": rectángulos del tejido del escudo y un chulo. Lienzo adaptativo de 108 dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M42,33 H66 A9,9 0 0 1 75,42 V66 A9,9 0 0 1 66,75 H42 A9,9 0 0 1 33,66 V42 A9,9 0 0 1 42,33 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#1F7A87"
+        android:strokeWidth="3.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path android:pathData="M46,40 H62 A6,6 0 0 1 68,46 V62 A6,6 0 0 1 62,68 H46 A6,6 0 0 1 40,62 V46 A6,6 0 0 1 46,40 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#1F7A87"
+        android:strokeWidth="3.4"
+        android:strokeAlpha="0.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path android:pathData="M50,47 H58 A3,3 0 0 1 61,50 V58 A3,3 0 0 1 58,61 H50 A3,3 0 0 1 47,58 V50 A3,3 0 0 1 50,47 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#1F7A87"
+        android:strokeWidth="3.4"
+        android:strokeAlpha="0.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path android:pathData="M43,58 L51,66 L68,46"
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="12.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path android:pathData="M43,58 L51,66 L68,46"
+        android:fillColor="#00000000"
+        android:strokeColor="#D9912F"
+        android:strokeWidth="7"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
