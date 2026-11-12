@@ -125,9 +125,14 @@ class UiAvatar extends StatelessWidget {
   final bool square;
   final double? size;
 
-  /// Iniciales de las dos primeras palabras ("Ana Lucía Pérez" → "AL").
+  /// Palabras que no aportan inicial ("Ingeniería de Software" → "IS").
+  static const _connectors = {'de', 'del', 'la', 'las', 'los', 'el', 'y', 'e', 'en', 'a', 'para'};
+
+  /// Iniciales de las dos primeras palabras con contenido ("Ana Lucía Pérez" → "AL").
   static String initialsOf(String name) {
-    final words = name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final all = name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final meaningful = all.where((w) => !_connectors.contains(w.toLowerCase())).toList();
+    final words = meaningful.isEmpty ? all : meaningful;
     if (words.isEmpty) return '?';
     final first = words.first.characters.first;
     final second = words.length > 1 ? words[1].characters.first : '';

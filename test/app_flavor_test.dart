@@ -46,8 +46,8 @@ void main() {
 
         expect(find.byType(StudentCoursesScreen), findsOneWidget);
         expect(find.byType(CoursesDashboardScreen), findsNothing);
-        expect(find.text('Mis Cursos Enrolados'), findsOneWidget);
-        expect(find.byIcon(Icons.bluetooth_searching), findsOneWidget);
+        expect(find.text('Asistencia'), findsOneWidget);
+        expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
       },
     );
 

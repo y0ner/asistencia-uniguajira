@@ -1,27 +1,20 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 
-import '../../core/constants/app_constants.dart';
-import '../../core/crypto/ble_packet_codec.dart';
 import '../../core/models/student_enrollment_model.dart';
 import '../../data/local/app_database.dart';
 import '../../data/services/student_enrollment_service.dart';
-import '../../theme/theme.dart';
+import '../../ui/ui.dart';
 import '../shared/hardware_diagnostic_dialog.dart';
 import 'student_live_beacon_screen.dart';
 import 'student_qr_enrollment_screen.dart';
 
-/// Pantalla principal de la billetera de cursos enrolados del estudiante.
+/// Pantalla principal de inicio para el estudiante.
 ///
 /// Permite:
-/// - Visualizar los cursos en los que el estudiante está enrolado localmente.
-/// - Consultar su código estudiantil y su posición asignada en el Bitmap (0..63).
-/// - Previsualizar la rotación de su token HMAC y configurar el PIN verbal BLE.
-/// - Desvincular credenciales locales si es necesario.
-/// - Acceder al escáner QR de enrolamiento del primer día de clase.
+/// - Visualizar las clases en las que está inscrito el estudiante.
+/// - Marcar asistencia en vivo en una clase mediante Bluetooth.
+/// - Salir de una clase desvinculando la credencial local.
+/// - Unirse a una nueva clase escaneando el código QR del profesor o pegando el código.
 class StudentCoursesScreen extends StatefulWidget {
   const StudentCoursesScreen({
     super.key,
@@ -38,6 +31,7 @@ class StudentCoursesScreen extends StatefulWidget {
 
 class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
   late final StudentEnrollmentService _enrollmentService;
+  late final AppDatabase _database;
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -46,9 +40,9 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
   @override
   void initState() {
     super.initState();
-    final db = widget.database ?? AppDatabase.instance;
+    _database = widget.database ?? AppDatabase.instance;
     _enrollmentService =
-        widget.enrollmentService ?? StudentEnrollmentService(db);
+        widget.enrollmentService ?? StudentEnrollmentService(_database);
     _loadEnrollments();
   }
 
@@ -60,15 +54,17 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
 
     try {
       final enrollments = await _enrollmentService.getEnrolledCourses();
+
       if (!mounted) return;
       setState(() {
         _enrollments = enrollments;
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('Error al cargar clases: $e\n$st');
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Error al cargar cursos enrolados: $e';
+        _errorMessage = 'No se pudieron cargar tus clases.';
         _isLoading = false;
       });
     }
@@ -79,6 +75,7 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
       MaterialPageRoute<StudentEnrollmentModel>(
         builder: (_) => StudentQrEnrollmentScreen(
           enrollmentService: _enrollmentService,
+          database: _database,
         ),
       ),
     );
@@ -88,16 +85,7 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
     if (result != null) {
       await _loadEnrollments();
       if (!mounted) return;
-      final colors = AppColors.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '¡Enrolado exitosamente en ${result.courseName}! '
-            'Bit #${result.bitIndex.toString().padLeft(2, '0')}',
-          ),
-          backgroundColor: colors.statusNormal,
-        ),
-      );
+      showUiSnack(context, 'Ya estás en ${result.courseName}.');
     }
   }
 
@@ -111,39 +99,70 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
     );
   }
 
-  Future<void> _confirmRemoveEnrollment(
+  Future<void> _showCourseOptionsSheet(
     StudentEnrollmentModel enrollment,
   ) async {
-    final colors = AppColors.of(context);
-    final radii = AppRadii.of(context);
+    final subtitle = _buildSubtitle(enrollment);
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext ctx) {
-        return AlertDialog(
-          shape: radii.dialogShape(),
-          title: const Text('¿Desvincular curso?'),
-          content: Text(
-            'Se eliminará tu credencial criptográfica del curso '
-            '"${enrollment.courseName}". Para volver a marcar asistencia, '
-            'deberás escanear el QR del docente nuevamente.',
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancelar'),
+    await showUiSheet<void>(
+      context,
+      builder: (sheetContext) {
+        final c = UiColors.of(sheetContext);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: UiSpace.sm),
+            Text(
+              enrollment.courseName,
+              style: UiText.h2.copyWith(color: c.ink),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: colors.statusPerdida,
-                foregroundColor: colors.onStatusPerdida,
+            const SizedBox(height: UiSpace.xs),
+            Text(
+              subtitle,
+              style: UiText.label.copyWith(color: c.muted),
+            ),
+            const SizedBox(height: UiSpace.lg),
+            InkWell(
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _confirmRemoveEnrollment(enrollment);
+              },
+              borderRadius: BorderRadius.circular(UiRadius.md),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: UiSize.touch),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: UiSpace.sm),
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline_rounded, color: c.absentText),
+                      const SizedBox(width: UiSpace.md),
+                      Text(
+                        'Salir de esta clase',
+                        style: UiText.bodyStrong.copyWith(color: c.absentText),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Desvincular'),
             ),
           ],
         );
       },
+    );
+  }
+
+  Future<void> _confirmRemoveEnrollment(
+    StudentEnrollmentModel enrollment,
+  ) async {
+    final confirmed = await showUiConfirm(
+      context,
+      title: '¿Salir de esta clase?',
+      message: 'Para volver tendrás que pedirle el código a tu profesor.',
+      confirmLabel: 'Salir',
+      destructive: true,
     );
 
     if (confirmed == true) {
@@ -151,691 +170,177 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
         await _enrollmentService.removeEnrollment(enrollment.id);
         await _loadEnrollments();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Credencial de "${enrollment.courseName}" desvinculada.',
-              ),
-            ),
-          );
+          showUiSnack(context, 'Saliste de la clase.');
         }
-      } catch (e) {
+      } catch (e, st) {
+        debugPrint('Error al salir de la clase: $e\n$st');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error al desvincular curso: $e'),
-              backgroundColor: colors.statusPerdida,
-            ),
-          );
+          showUiSnack(context, 'No se pudo salir de la clase.');
         }
       }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mis Cursos Enrolados'),
-        actions: <Widget>[
-          IconButton(
-            tooltip: 'Diagnóstico de Permisos Hardware',
-            icon: const Icon(Icons.bluetooth_searching),
-            onPressed: () => showHardwareDiagnosticDialog(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            tooltip: 'Escanear QR de enrolamiento',
-            onPressed: _openQrScanner,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Actualizar lista',
-            onPressed: _loadEnrollments,
-          ),
-        ],
-      ),
-      body: _buildBody(),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openQrScanner,
-        icon: const Icon(Icons.qr_code_scanner),
-        label: const Text('Escanear QR'),
-      ),
-    );
-  }
+  // El celular del estudiante no guarda las clases del docente: solo se
+  // conoce el código que trae la inscripción.
+  String _buildSubtitle(StudentEnrollmentModel enrollment) => enrollment.courseCode;
 
-  Widget _buildBody() {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_errorMessage != null) {
-      return Center(
-        child: Padding(
-          padding: spacing.insetsLg,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(
-                Icons.error_outline,
-                size: 56,
-                color: colors.statusPerdida,
-              ),
-              SizedBox(height: spacing.md),
-              Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: colors.onSurface,
-                ),
-              ),
-              SizedBox(height: spacing.md),
-              FilledButton.icon(
-                onPressed: _loadEnrollments,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reintentar'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (_enrollments.isEmpty) {
-      return Center(
-        child: SingleChildScrollView(
-          padding: spacing.insetsXl,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Container(
-                  padding: spacing.insetsLg,
-                  decoration: BoxDecoration(
-                    color: colors.primaryContainer.withValues(alpha: 0.5),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.school_outlined,
-                    size: 72,
-                    color: colors.primary,
-                  ),
-                ),
-                SizedBox(height: spacing.lg),
-                Text(
-                  'Aún no estás enrolado en ningún curso',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colors.onSurface,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: spacing.sm),
-                Text(
-                  'Escanea el código QR en el teléfono de tu docente el primer '
-                  'día de clase para recibir tu posición en el Mapa de Bits y tu '
-                  'semilla criptográfica.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceMuted,
-                    height: 1.4,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: spacing.xl),
-                FilledButton.icon(
-                  onPressed: _openQrScanner,
-                  icon: const Icon(Icons.qr_code_scanner),
-                  label: const Text('Enrolar Primer Curso'),
-                  style: FilledButton.styleFrom(
-                    padding: spacing.symmetric(
-                      horizontal: spacing.lg,
-                      vertical: spacing.sm,
-                    ),
-                    shape: radii.buttonShape(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadEnrollments,
-      child: ListView.builder(
-        padding: spacing.only(
-          left: spacing.md,
-          right: spacing.md,
-          top: spacing.md,
-          bottom: spacing.xxl + spacing.xl,
-        ),
-        itemCount: _enrollments.length,
-        itemBuilder: (BuildContext context, int index) {
-          final enrollment = _enrollments[index];
-          return _EnrollmentCard(
-            enrollment: enrollment,
-            onMarkAttendance: () => _openLiveBeaconScreen(enrollment),
-            onRemove: () => _confirmRemoveEnrollment(enrollment),
-          );
-        },
-      ),
-    );
-  }
-}
-
-/// Tarjeta individual de curso enrolado.
-class _EnrollmentCard extends StatelessWidget {
-  const _EnrollmentCard({
-    required this.enrollment,
-    required this.onMarkAttendance,
-    required this.onRemove,
-  });
-
-  final StudentEnrollmentModel enrollment;
-  final VoidCallback onMarkAttendance;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-
-    final enrolledDate = DateTime.fromMillisecondsSinceEpoch(
-      enrollment.enrolledAtEpochMs,
-    );
-    final formattedDate = DateFormat('dd/MM/yyyy · HH:mm').format(enrolledDate);
-
-    return Card(
-      elevation: 0,
-      margin: spacing.only(bottom: spacing.md),
-      shape: radii.cardShape(side: BorderSide(color: colors.outlineVariant)),
-      child: Padding(
-        padding: spacing.insetsCard,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            // Cabecera: Nombre de la asignatura y código
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Container(
-                  padding: spacing.all(spacing.xs + 2),
-                  decoration: BoxDecoration(
-                    color: colors.primaryContainer,
-                    borderRadius: radii.borderMd,
-                  ),
-                  child: Icon(
-                    Icons.menu_book_rounded,
-                    color: colors.primary,
-                    size: 24,
-                  ),
-                ),
-                SizedBox(width: spacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        enrollment.courseName,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colors.onSurface,
-                        ),
-                      ),
-                      SizedBox(height: spacing.xxs / 2),
-                      Container(
-                        padding: spacing.symmetric(
-                          horizontal: spacing.xs,
-                          vertical: spacing.xxs / 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainerHigh,
-                          borderRadius: radii.borderXs,
-                        ),
-                        child: Text(
-                          'Código: ${enrollment.courseCode}',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: colors.onSurfaceMuted,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    Icons.delete_outline,
-                    color: colors.statusPerdida,
-                  ),
-                  tooltip: 'Desvincular credencial',
-                  onPressed: onRemove,
-                ),
-              ],
-            ),
-            Divider(height: spacing.lg),
-
-            // Datos del estudiante
-            Row(
-              children: <Widget>[
-                Icon(
-                  Icons.person_outline,
-                  size: 20,
-                  color: colors.primary,
-                ),
-                SizedBox(width: spacing.xs),
-                Expanded(
-                  child: Text(
-                    enrollment.fullName,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: colors.onSurface,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: spacing.xxs + 2),
-            Row(
-              children: <Widget>[
-                Icon(
-                  Icons.badge_outlined,
-                  size: 20,
-                  color: colors.primary,
-                ),
-                SizedBox(width: spacing.xs),
-                Text(
-                  'Código: ${enrollment.studentCode}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.w500,
-                    color: colors.onSurface,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: spacing.sm),
-
-            // Badge destacado con el Bit asignado en el Bitmap (0..63)
-            Container(
-              width: double.infinity,
-              padding: spacing.symmetric(horizontal: spacing.sm + 2, vertical: spacing.xs + 2),
-              decoration: BoxDecoration(
-                color: colors.primaryContainer.withValues(alpha: 0.6),
-                borderRadius: radii.borderSm,
-                border: Border.all(
-                  color: colors.primary.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                children: <Widget>[
-                  Icon(
-                    Icons.tag_rounded,
-                    size: 22,
-                    color: colors.primary,
-                  ),
-                  SizedBox(width: spacing.xs),
-                  Expanded(
-                    child: Text(
-                      'Bit Asignado: #${enrollment.bitIndex.toString().padLeft(2, '0')} (0..63)',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colors.onPrimaryContainer,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.verified_outlined,
-                    size: 20,
-                    color: colors.primary,
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: spacing.xs),
-
-            // Fecha de enrolamiento
-            Text(
-              'Enrolado el $formattedDate',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colors.onSurfaceMuted,
-              ),
-            ),
-            SizedBox(height: spacing.md),
-
-            // Botón de acción principal
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: onMarkAttendance,
-                icon: const Icon(Icons.bluetooth_searching),
-                label: const Text('Marcar Asistencia BLE'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: colors.primary,
-                  foregroundColor: colors.onPrimary,
-                  padding: spacing.symmetric(vertical: spacing.sm),
-                  shape: radii.buttonShape(),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Diálogo modal interactivo para previsualizar la asistencia BLE y el token HMAC rotativo.
-class StudentBleAttendancePreviewDialog extends StatefulWidget {
-  const StudentBleAttendancePreviewDialog({
-    super.key,
-    required this.enrollment,
-  });
-
-  final StudentEnrollmentModel enrollment;
-
-  @override
-  State<StudentBleAttendancePreviewDialog> createState() =>
-      _StudentBleAttendancePreviewDialogState();
-}
-
-class _StudentBleAttendancePreviewDialogState
-    extends State<StudentBleAttendancePreviewDialog> {
-  late final TextEditingController _pinController;
-  Timer? _tickerTimer;
-  DateTime _now = DateTime.now();
-
-  @override
-  void initState() {
-    super.initState();
-    _pinController = TextEditingController();
-    _pinController.addListener(() => setState(() {}));
-    _tickerTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {
-          _now = DateTime.now();
-        });
+  String _computeOverline(DateTime now) {
+    if (_enrollments.isNotEmpty) {
+      final raw = _enrollments.first.fullName.trim();
+      if (raw.isNotEmpty) {
+        final firstWord = raw.split(RegExp(r'\s+')).first;
+        if (firstWord.isNotEmpty) {
+          final capitalized =
+              firstWord[0].toUpperCase() + firstWord.substring(1).toLowerCase();
+          return 'Hola, $capitalized';
+        }
       }
-    });
+    }
+    return UiFormat.longDate(now);
   }
 
-  @override
-  void dispose() {
-    _tickerTimer?.cancel();
-    _pinController.dispose();
-    super.dispose();
+  Widget _buildEnrollmentCard(StudentEnrollmentModel enrollment, int index) {
+    final c = UiColors.of(context);
+    final subtitle = _buildSubtitle(enrollment);
+
+    return UiCard(
+      radius: 22,
+      padding: const EdgeInsets.all(UiSpace.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              UiAvatar(name: enrollment.courseName, square: true),
+              const SizedBox(width: UiSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      enrollment.courseName,
+                      style: UiText.title.copyWith(color: c.ink),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: UiText.label.copyWith(color: c.muted),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: UiSpace.sm),
+              UiRoundIconButton(
+                icon: Icons.more_horiz_rounded,
+                tooltip: 'Opciones de la clase',
+                onPressed: () => _showCourseOptionsSheet(enrollment),
+              ),
+            ],
+          ),
+          const SizedBox(height: UiSpace.md),
+          UiButton(
+            label: 'Marcar asistencia',
+            compact: true,
+            variant:
+                index == 0 ? UiButtonVariant.primary : UiButtonVariant.tonal,
+            onPressed: () => _openLiveBeaconScreen(enrollment),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
+    final now = DateTime.now();
 
-    final currentTick = BlePacketCodec.computeTimeTick(_now);
-    final epochSeconds = _now.millisecondsSinceEpoch ~/ 1000;
-    final elapsedInWindow = epochSeconds % AppConstants.hmacWindowSeconds;
-    final secondsRemaining = AppConstants.hmacWindowSeconds - elapsedInWindow;
-    final progress = secondsRemaining / AppConstants.hmacWindowSeconds;
-
-    final verifyCode = BlePacketCodec.generateAttendanceVerifyCode(
-      courseId: widget.enrollment.courseId,
-      studentCode: widget.enrollment.studentCode,
-      bitIndex: widget.enrollment.bitIndex,
-      timeTick: currentTick,
-      secretHex: widget.enrollment.deviceSecret,
-    );
-
-    final pinText = _pinController.text.trim();
-    final isPinValid =
-        pinText.length == AppConstants.roomPinLength &&
-        int.tryParse(pinText) != null;
-
-    return AlertDialog(
-      shape: radii.dialogShape(),
-      title: Row(
-        children: <Widget>[
-          Icon(Icons.bluetooth_searching, color: colors.primary),
-          SizedBox(width: spacing.xs),
-          const Expanded(
-            child: Text(
-              'Asistencia BLE · Vista Previa',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    final Widget body;
+    if (_isLoading) {
+      body = const Center(child: CircularProgressIndicator());
+    } else if (_errorMessage != null) {
+      body = Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: UiSpace.page),
+          child: UiBanner(
+            tone: UiBannerTone.error,
+            message: _errorMessage!,
+            actionLabel: 'Volver a intentar',
+            onAction: _loadEnrollments,
+          ),
+        ),
+      );
+    } else if (_enrollments.isEmpty) {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          UiPageHeading(
+            overline: UiFormat.longDate(now),
+            title: '¿A qué clase llegaste?',
+          ),
+          Expanded(
+            child: UiEmptyState(
+              icon: Icons.qr_code_scanner_rounded,
+              title: 'Aún no estás en ninguna clase',
+              message:
+                  'Pídele a tu profesor el código QR de la clase y únete.',
+              actionLabel: 'Unirme a una clase',
+              onAction: _openQrScanner,
             ),
           ),
         ],
-      ),
-      content: SingleChildScrollView(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 380),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              // Asignatura y estudiante
-              Container(
-                padding: spacing.insetsSm,
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHigh,
-                  borderRadius: radii.borderSm,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      widget.enrollment.courseName,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colors.onSurface,
-                      ),
-                    ),
-                    SizedBox(height: spacing.xxs / 2),
-                    Text(
-                      '${widget.enrollment.fullName} · Código: ${widget.enrollment.studentCode}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceMuted,
-                      ),
-                    ),
-                    SizedBox(height: spacing.xxs),
-                    Text(
-                      'Bit Asignado: #${widget.enrollment.bitIndex.toString().padLeft(2, '0')}',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+      );
+    } else {
+      body = RefreshIndicator(
+        onRefresh: _loadEnrollments,
+        child: ListView.builder(
+          padding: const EdgeInsets.only(bottom: UiSpace.xxl),
+          itemCount: _enrollments.length + 1,
+          itemBuilder: (BuildContext context, int index) {
+            if (index == 0) {
+              return UiPageHeading(
+                overline: _computeOverline(now),
+                title: '¿A qué clase llegaste?',
+              );
+            }
+            final enrollment = _enrollments[index - 1];
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(
+                UiSpace.page,
+                0,
+                UiSpace.page,
+                UiSpace.md,
               ),
-              SizedBox(height: spacing.md),
+              child: _buildEnrollmentCard(enrollment, index - 1),
+            );
+          },
+        ),
+      );
+    }
 
-              // Campo de PIN verbal de 2 dígitos
-              Text(
-                'PIN Verbal del Aula (2 dígitos)',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colors.onSurface,
-                ),
-              ),
-              SizedBox(height: spacing.xxs + 2),
-              TextField(
-                controller: _pinController,
-                keyboardType: TextInputType.number,
-                maxLength: AppConstants.roomPinLength,
-                inputFormatters: <TextInputFormatter>[
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 10,
-                  color: colors.onSurface,
-                ),
-                decoration: InputDecoration(
-                  hintText: '00',
-                  counterText: '',
-                  prefixIcon: const Icon(Icons.pin_outlined),
-                  suffixIcon: isPinValid
-                      ? Icon(Icons.check_circle, color: colors.statusNormal)
-                      : Icon(Icons.info_outline, color: colors.onSurfaceMuted),
-                  helperText: 'Dictado en voz alta por el docente en el aula.',
-                  helperMaxLines: 2,
-                ),
-              ),
-              SizedBox(height: spacing.md),
-
-              // Tarjeta de previsualización del Token HMAC rotativo
-              Container(
-                padding: spacing.insetsCard,
-                decoration: BoxDecoration(
-                  color: colors.primaryContainer.withValues(alpha: 0.4),
-                  borderRadius: radii.borderMd,
-                  border: Border.all(
-                    color: colors.primary.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Column(
-                  children: <Widget>[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        Text(
-                          'SELLO CRIPTOGRÁFICO',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            letterSpacing: 1.2,
-                            fontWeight: FontWeight.bold,
-                            color: colors.primary,
-                          ),
-                        ),
-                        Container(
-                          padding: spacing.symmetric(
-                            horizontal: spacing.xxs + 2,
-                            vertical: spacing.xxs / 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colors.primary,
-                            borderRadius: radii.borderXs,
-                          ),
-                          child: Text(
-                            'Ventana 30s',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colors.onPrimary,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: spacing.xs),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Text(
-                          verifyCode,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2,
-                            color: colors.primary,
-                          ),
-                        ),
-                        SizedBox(width: spacing.xs),
-                        IconButton(
-                          icon: const Icon(Icons.copy, size: 20),
-                          tooltip: 'Copiar token',
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(text: verifyCode));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Token copiado al portapapeles'),
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: spacing.xs),
-                    LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: colors.primary.withValues(alpha: 0.15),
-                      color: colors.primary,
-                      borderRadius: radii.borderXs,
-                    ),
-                    SizedBox(height: spacing.xxs + 2),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        Text(
-                          'Rotación en ${secondsRemaining}s',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colors.onSurface,
-                          ),
-                        ),
-                        Text(
-                          'Tick #$currentTick',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colors.onSurfaceMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: spacing.sm + 2),
-
-              // Nota informativa
-              Container(
-                padding: spacing.insetsSm,
-                decoration: BoxDecoration(
-                  color: colors.secondaryContainer.withValues(alpha: 0.4),
-                  borderRadius: radii.borderSm,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Icon(
-                      Icons.info_outline,
-                      size: 18,
-                      color: colors.secondary,
-                    ),
-                    SizedBox(width: spacing.xs),
-                    Expanded(
-                      child: Text(
-                        'Modo previsualización: La emisión BLE publicitaria y '
-                        'sincronización con el radar del aula se conecta en tiempo real. '
-                        'Tu credencial criptográfica local está activa y verificada.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 11,
-                          color: colors.onSecondaryContainer,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+    return UiPage(
+      header: UiBrandHeader(
+        trailing: UiRoundIconButton(
+          icon: Icons.tune_rounded,
+          tooltip: 'Ajustes y diagnóstico',
+          onPressed: () => showHardwareDiagnosticDialog(context),
         ),
       ),
-      actions: <Widget>[
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Entendido / Cerrar'),
-        ),
-      ],
+      bottom: _isLoading || _errorMessage != null || _enrollments.isEmpty
+          ? null
+          : UiButton(
+              label: 'Unirme a una clase',
+              icon: Icons.qr_code_scanner_rounded,
+              variant: UiButtonVariant.outline,
+              onPressed: _openQrScanner,
+            ),
+      body: body,
     );
   }
 }
