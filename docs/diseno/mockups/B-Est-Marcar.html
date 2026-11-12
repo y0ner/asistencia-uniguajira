@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>B · Estudiante · Marcar asistencia</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; background: {{bg}}; color: {{ink}}; font-family: 'Figtree', system-ui, sans-serif">
+
+<div style="display: flex; align-items: center; gap: 12px; padding: 14px 20px 10px">
+<a href="B-Est-Inicio.dc.html" aria-label="Volver a tus clases" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: {{sf}}; border: 1px solid {{line}}; border-radius: 999px; color: {{ink}}; text-decoration: none">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8H3M7 4L3 8l4 4"></path></svg>
+</a>
+<div style="display: flex; flex-direction: column; gap: 6px; flex-grow: 1">
+<span style="font-size: 18px; font-weight: 700; letter-spacing: -0.02em">Bases de Datos II</span>
+<div role="img" aria-label="{{stepLabel}}" style="display: flex; gap: 5px">
+<span style="width: 40px; height: 5px; border-radius: 999px; background: {{s1}}"></span>
+<span style="width: 40px; height: 5px; border-radius: 999px; background: {{s2}}"></span>
+<span style="width: 40px; height: 5px; border-radius: 999px; background: {{s3}}"></span>
+</div>
+</div>
+<span style="font-size: 13px; font-weight: 600; color: {{mut}}">{{stepLabel}}</span>
+</div>
+
+<sc-if value="{{isPin}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; flex-grow: 1">
+<div style="padding: 24px 20px 18px">
+<h1 style="margin: 0; font-size: 28px; line-height: 1.15; font-weight: 800; letter-spacing: -0.02em">Escribe el PIN que dictó tu profesor</h1>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 20px">
+<div style="height: 112px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 22px; background: {{sf}}; border: 2px solid {{pri}}; font-size: 64px; font-weight: 800; letter-spacing: -0.02em; line-height: 1">4</div>
+<div style="height: 112px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 22px; background: {{sf}}; border: 2px dashed {{line}}">
+<span style="width: 4px; height: 52px; border-radius: 2px; background: {{pri}}"></span>
+</div>
+</div>
+<div style="flex-grow: 1"></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 0 28px">
+<button style="height: 58px; border-radius: 18px; background: {{sf}}; color: {{ink}}; border: 1px solid {{line}}; font-family: 'Figtree', system-ui, sans-serif; font-size: 22px; font-weight: 600; cursor: pointer">1</button>
+<button style="height: 58px; border-radius: 18px; background: {{sf}}; color: {{ink}}; border: 1px solid {{line}}; font-family: 'Figtree', system-ui, sans-serif; font-size: 22px; font-weight: 600; cursor: pointer">2</button>
+<button style="height: 58px; border-radius: 18px; background: {{sf}}; color: {{ink}}; border: 1px solid {{line}}; font-family: 'Figtree', system-ui, sans-serif; font-size: 22px; font-weight: 600; cursor: pointer">3</button>
+<button style="height: 58px; border-radius: 18px; background: {{sf}}; color: {{ink}}; border: 1px solid {{line}}; font-family: 'Figtree', system-ui, sans-serif; font-size: 22px; font-weight: 600; cursor: pointer">4</button>
+<button style="height: 58px; border-radius: 18px; background: {{sf}}; color: {{ink}}; border: 1px solid {{line}}; font-family: 'Figtree', system-ui, sans-serif; font-size: 22px; font-weight: 600; cursor: pointer">5</button>
+<button style="height: 58px; border-radius: 18px; background: {{sf}}; color: {{ink}}; border: 1px solid {{line}}; font-family: 'Figtree', system-ui, sans-serif; font-size: 22px; font-weight: 600; cursor: pointer">6</button>
+<button style="height: 58px; border-radius: 18px; background: {{sf}}; color: {{ink}}; border: 1px solid {{line}}; font-family: 'Figtree', system-ui, sans-serif; font-size: 22px; font-weight: 600; cursor: pointer">7</button>
+<button style="height: 58px; border-radius: 18px; background: {{sf}}; color: {{ink}}; border: 1px solid {{line}}; font-family: 'Figtree', system-ui, sans-serif; font-size: 22px; font-weight: 600; cursor: pointer">8</button>
+<button style="height: 58px; border-radius: 18px; background: {{sf}}; color: {{ink}}; border: 1px solid {{line}}; font-family: 'Figtree', system-ui, sans-serif; font-size: 22px; font-weight: 600; cursor: pointer">9</button>
+<div style="height: 58px"></div>
+<button style="height: 58px; border-radius: 18px; background: {{sf}}; color: {{ink}}; border: 1px solid {{line}}; font-family: 'Figtree', system-ui, sans-serif; font-size: 22px; font-weight: 600; cursor: pointer">0</button>
+<button aria-label="Borrar" style="height: 58px; display: flex; align-items: center; justify-content: center; border-radius: 18px; background: transparent; color: {{ink}}; border: 0; cursor: pointer">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h11v12H7l-5-6zM10 8l4 4M14 8l-4 4"></path></svg>
+</button>
+</div>
+<div style="padding: 16px 20px 24px">
+<a href="B-Est-Acercar.dc.html" style="height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 18px; background: {{pri}}; color: {{onpri}}; text-decoration: none; font-size: 16px; font-weight: 700">Continuar</a>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isNear}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; flex-grow: 1">
+<div style="padding: 24px 20px 18px">
+<h1 style="margin: 0; font-size: 28px; line-height: 1.15; font-weight: 800; letter-spacing: -0.02em">Acerca tu celular al del profesor</h1>
+</div>
+<div style="margin: 0 20px; height: 300px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; padding: 16px; border-radius: 28px; background: {{tint}}">
+<div style="display: flex; justify-content: space-between">
+<span style="padding: 6px 12px; border-radius: 999px; background: {{sf}}; font-size: 13px; font-weight: 700">PIN 47</span>
+<span style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: {{pri}}; color: {{onpri}}; font-size: 13px; font-weight: 700"><span style="width: 7px; height: 7px; border-radius: 999px; background: {{onpri}}"></span>Buscando al profesor</span>
+</div>
+<div role="img" aria-label="Tu celular enviando señal al celular del profesor" style="display: flex; align-items: center; justify-content: center; gap: 12px">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+<div style="width: 60px; height: 108px; box-sizing: border-box; border-radius: 16px; border: 2.500px solid {{ink}}; background: {{sf}}; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px"><span style="width: 18px; height: 3px; border-radius: 999px; background: {{ink}}"></span></div>
+<span style="font-size: 13px; font-weight: 700">Tú</span>
+</div>
+<svg aria-hidden="true" width="64" height="72" viewBox="0 0 64 72" fill="none" stroke-width="5" stroke-linecap="round" style="margin-bottom: 24px"><path d="M10 26a14 14 0 0 1 0 20" stroke="{{pri}}"></path><path d="M26 16a26 26 0 0 1 0 40" stroke="{{pri}}"></path><path d="M42 6a40 40 0 0 1 0 60" stroke="{{line}}"></path></svg>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+<div style="width: 60px; height: 108px; box-sizing: border-box; border-radius: 16px; background: {{pri}}; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px"><span style="width: 18px; height: 3px; border-radius: 999px; background: {{onpri}}"></span></div>
+<span style="font-size: 13px; font-weight: 700">Profesor</span>
+</div>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: {{tintTx}}">
+<span>Señal media: acércate un poco más</span>
+<span>0:12</span>
+</div>
+</div>
+<p style="margin: 0; padding: 16px 20px 0; font-size: 15px; line-height: 1.45; color: {{mut}}">Deja esta pantalla abierta. Te avisamos apenas quedes registrado.</p>
+<div style="flex-grow: 1"></div>
+<div style="padding: 16px 20px 24px">
+<a href="B-Est-Marcar.dc.html" style="height: 54px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 16px; border: 1.500px solid {{pri}}; color: {{priTx}}; text-decoration: none; font-size: 16px; font-weight: 700">Cambiar PIN</a>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isDone}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; flex-grow: 1">
+<div style="position: relative; overflow: hidden; margin: 12px 20px 0; height: 290px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; padding: 22px; border-radius: 28px; background: {{pri}}; color: {{onpri}}">
+<svg aria-hidden="true" width="220" height="220" viewBox="0 0 150 150" fill="none" stroke="{{onpri}}" stroke-width="5" style="position: absolute; right: -60px; top: -60px; opacity: 0.16"><rect x="5" y="5" width="140" height="140" rx="8"></rect><rect x="25" y="25" width="100" height="100" rx="6"></rect><rect x="45" y="45" width="60" height="60" rx="4"></rect><rect x="63" y="63" width="24" height="24" rx="2"></rect></svg>
+<span role="img" aria-label="Confirmado" style="width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: {{onpri}}; color: {{pri}}">
+<svg aria-hidden="true" width="30" height="30" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.500" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.500l3.500 3.500L13 4.500"></path></svg>
+</span>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 15px; font-weight: 600">Asistencia registrada</span>
+<span style="font-size: 54px; line-height: 1; font-weight: 800; letter-spacing: -0.03em">¡Presente!</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; margin: 12px 20px 0; border-radius: 20px; background: {{sf}}; border: 1px solid {{line}}; overflow: hidden">
+<div style="display: flex; align-items: center; justify-content: space-between; height: 50px; padding: 0 14px; border-bottom: 1px solid {{line}}">
+<span style="font-size: 13px; color: {{mut}}">Clase</span>
+<span style="font-size: 15px; font-weight: 600">Bases de Datos II</span>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; height: 50px; padding: 0 14px; border-bottom: 1px solid {{line}}">
+<span style="font-size: 13px; color: {{mut}}">Fecha y hora</span>
+<span style="font-size: 15px; font-weight: 600">Mié 11 nov · 8:41 a. m.</span>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between; height: 50px; padding: 0 14px">
+<span style="font-size: 13px; color: {{mut}}">Confirmó</span>
+<span style="font-size: 15px; font-weight: 600">El celular del profesor</span>
+</div>
+</div>
+<p style="margin: 0; padding: 16px 20px 0; font-size: 15px; line-height: 1.45; color: {{mut}}">Ya puedes guardar el celular.</p>
+<div style="flex-grow: 1"></div>
+<div style="padding: 16px 20px 24px">
+<a href="B-Est-Inicio.dc.html" style="height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 18px; background: {{pri}}; color: {{onpri}}; text-decoration: none; font-size: 16px; font-weight: 700">Listo</a>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"paso":{"editor":"enum","options":["pin","acercar","listo"],"default":"pin"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const dark = this.props.dark ?? false;
+const paso = this.props.paso ?? 'pin';
+const t = dark
+? { bg: '#0C1719', sf: '#142326', ink: '#EEF5F6', mut: '#9DB3B7', line: '#24383C', pri: '#4CA4B0', onpri: '#06181B', priTx: '#7CC7D1', veil: 'rgba(6,24,27,0.16)', tint: '#18363B', tintTx: '#8BD0DA', manBg: '#3A2C12', manTx: '#F0BE72', noBg: '#3B1E19', noTx: '#F0958A' }
+: { bg: '#F3F6F6', sf: '#FFFFFF', ink: '#10262B', mut: '#51666B', line: '#DDE5E6', pri: '#1F7A87', onpri: '#FFFFFF', priTx: '#17616C', veil: 'rgba(255,255,255,0.22)', tint: '#E3F1F3', tintTx: '#17616C', manBg: '#FCF1DD', manTx: '#7A4E08', noBg: '#FBE9E6', noTx: '#A23A2B' };
+const n = paso === 'listo' ? 3 : paso === 'acercar' ? 2 : 1;
+return Object.assign({
+isPin: n === 1,
+isNear: n === 2,
+isDone: n === 3,
+stepLabel: 'Paso ' + n + ' de 3',
+s1: t.pri,
+s2: n >= 2 ? t.pri : t.line,
+s3: n >= 3 ? t.pri : t.line
+}, t);
+}
+}
+</script>
+</body>
+</html>

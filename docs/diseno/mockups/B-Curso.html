@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>B · Docente · Clase</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; background: {{bg}}; color: {{ink}}; font-family: 'Figtree', system-ui, sans-serif">
+
+<div style="display: flex; align-items: center; gap: 12px; padding: 14px 20px 10px">
+<a href="B-Main.dc.html" aria-label="Volver a tus clases" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: {{sf}}; border: 1px solid {{line}}; border-radius: 999px; color: {{ink}}; text-decoration: none">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8H3M7 4L3 8l4 4"></path></svg>
+</a>
+<div style="display: flex; flex-direction: column; gap: 1px; flex-grow: 1">
+<span style="font-size: 20px; font-weight: 700; letter-spacing: -0.02em">Bases de Datos II</span>
+<span style="font-size: 13px; color: {{mut}}">SIST-401 · Grupo 01 · 2026-2</span>
+</div>
+<button aria-label="Editar clase" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: {{sf}}; border: 1px solid {{line}}; border-radius: 999px; color: {{ink}}; padding: 0; cursor: pointer">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="8" r="1.500"></circle><circle cx="8" cy="8" r="1.500"></circle><circle cx="13" cy="8" r="1.500"></circle></svg>
+</button>
+</div>
+
+<a href="B-Sesion.dc.html" style="position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 20px 0; padding: 22px 20px; border-radius: 24px; background: {{pri}}; color: {{onpri}}; text-decoration: none">
+<svg aria-hidden="true" width="150" height="150" viewBox="0 0 150 150" fill="none" stroke="{{onpri}}" stroke-width="6" style="position: absolute; right: 40px; top: -70px; opacity: 0.14"><rect x="5" y="5" width="140" height="140" rx="8"></rect><rect x="25" y="25" width="100" height="100" rx="6"></rect><rect x="45" y="45" width="60" height="60" rx="4"></rect><rect x="63" y="63" width="24" height="24" rx="2"></rect></svg>
+<span style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em">Tomar asistencia</span>
+<span style="font-size: 13px; font-weight: 500">32 estudiantes · 28 con celular vinculado</span>
+</span>
+<span style="width: 52px; height: 52px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: {{onpri}}; color: {{pri}}">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"></path></svg>
+</span>
+</a>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 20px 0">
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 18px; background: {{sf}}; border: 1px solid {{line}}">
+<span style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1">12</span>
+<span style="font-size: 13px; color: {{mut}}">sesiones</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 18px; background: {{sf}}; border: 1px solid {{line}}">
+<span style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1">91 %</span>
+<span style="font-size: 13px; color: {{mut}}">asistencia</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 18px; background: {{noBg}}; border: 1px solid {{noBg}}; color: {{noTx}}">
+<span style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1">3</span>
+<span style="font-size: 13px; font-weight: 600">en riesgo</span>
+</div>
+</div>
+
+<div style="padding: 20px 20px 10px; font-size: 16px; font-weight: 700">Últimas sesiones</div>
+
+<div style="display: flex; flex-direction: column; margin: 0 20px; border-radius: 20px; background: {{sf}}; border: 1px solid {{line}}; overflow: hidden">
+<a href="#" style="display: flex; align-items: center; gap: 12px; height: 58px; box-sizing: border-box; padding: 0 14px; color: {{ink}}; text-decoration: none; border-bottom: 1px solid {{line}}">
+<span style="flex-grow: 1; font-size: 15px; font-weight: 600">Lunes 9 de noviembre</span>
+<span style="font-size: 14px; color: {{mut}}">29 de 32</span>
+<span role="img" aria-label="91 por ciento" style="width: 48px; height: 6px; border-radius: 999px; background: {{line}}"><span style="display: block; width: 91%; height: 6px; border-radius: 999px; background: {{pri}}"></span></span>
+</a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; height: 58px; box-sizing: border-box; padding: 0 14px; color: {{ink}}; text-decoration: none; border-bottom: 1px solid {{line}}">
+<span style="flex-grow: 1; font-size: 15px; font-weight: 600">Miércoles 4 de noviembre</span>
+<span style="font-size: 14px; color: {{mut}}">30 de 32</span>
+<span role="img" aria-label="94 por ciento" style="width: 48px; height: 6px; border-radius: 999px; background: {{line}}"><span style="display: block; width: 94%; height: 6px; border-radius: 999px; background: {{pri}}"></span></span>
+</a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; height: 58px; box-sizing: border-box; padding: 0 14px; color: {{ink}}; text-decoration: none">
+<span style="flex-grow: 1; font-size: 15px; font-weight: 600">Lunes 2 de noviembre</span>
+<span style="font-size: 14px; color: {{mut}}">27 de 32</span>
+<span role="img" aria-label="84 por ciento" style="width: 48px; height: 6px; border-radius: 999px; background: {{line}}"><span style="display: block; width: 84%; height: 6px; border-radius: 999px; background: {{pri}}"></span></span>
+</a>
+</div>
+
+<div style="flex-grow: 1"></div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px 20px 24px">
+<a href="#" style="height: 54px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 16px; background: {{tint}}; color: {{tintTx}}; text-decoration: none; font-size: 15px; font-weight: 700">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linecap="round"><circle cx="8" cy="5" r="2.500"></circle><path d="M3 14c0-3 2-4.500 5-4.500s5 1.500 5 4.500"></path></svg>
+Estudiantes
+</a>
+<a href="#" style="height: 54px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 16px; background: {{tint}}; color: {{tintTx}}; text-decoration: none; font-size: 15px; font-weight: 700">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10V2M5 5l3-3 3 3M3 9v5h10V9"></path></svg>
+Enviar Excel
+</a>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const dark = this.props.dark ?? false;
+return dark
+? { bg: '#0C1719', sf: '#142326', ink: '#EEF5F6', mut: '#9DB3B7', line: '#24383C', pri: '#4CA4B0', onpri: '#06181B', priTx: '#7CC7D1', veil: 'rgba(6,24,27,0.16)', tint: '#18363B', tintTx: '#8BD0DA', manBg: '#3A2C12', manTx: '#F0BE72', noBg: '#3B1E19', noTx: '#F0958A' }
+: { bg: '#F3F6F6', sf: '#FFFFFF', ink: '#10262B', mut: '#51666B', line: '#DDE5E6', pri: '#1F7A87', onpri: '#FFFFFF', priTx: '#17616C', veil: 'rgba(255,255,255,0.22)', tint: '#E3F1F3', tintTx: '#17616C', manBg: '#FCF1DD', manTx: '#7A4E08', noBg: '#FBE9E6', noTx: '#A23A2B' };
+}
+}
+</script>
+</body>
+</html>

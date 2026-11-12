@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>B · Estudiante · Inicio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; background: {{bg}}; color: {{ink}}; font-family: 'Figtree', system-ui, sans-serif">
+
+<div style="display: flex; align-items: center; gap: 12px; padding: 14px 20px 10px">
+<div style="width: 44px; height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #FFFFFF; border: 1px solid {{line}}; border-radius: 14px">
+<img src="/_blob/162fcbccefcd0ad9c8f99b3b33834604" alt="Escudo de la Universidad de La Guajira" style="width: 24px; height: 32px; object-fit: contain">
+</div>
+<div style="display: flex; flex-direction: column; gap: 1px; flex-grow: 1">
+<span style="font-size: 17px; font-weight: 700; letter-spacing: -0.01em">Asistencia</span>
+<span style="font-size: 12px; font-weight: 500; color: {{mut}}">Universidad de La Guajira</span>
+</div>
+<button aria-label="Ajustes" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: {{sf}}; border: 1px solid {{line}}; border-radius: 999px; color: {{ink}}; padding: 0; cursor: pointer">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.600" stroke-linecap="round"><line x1="3" y1="5.500" x2="15" y2="5.500"></line><line x1="3" y1="12.500" x2="15" y2="12.500"></line><circle cx="11" cy="5.500" r="2" fill="{{sf}}"></circle><circle cx="7" cy="12.500" r="2" fill="{{sf}}"></circle></svg>
+</button>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 14px 20px 16px">
+<span style="font-size: 14px; font-weight: 500; color: {{mut}}">Hola, Ana</span>
+<h1 style="margin: 0; font-size: 30px; line-height: 1.1; font-weight: 800; letter-spacing: -0.02em">¿A qué clase llegaste?</h1>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 0 20px; flex-grow: 1">
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 22px; background: {{sf}}; border: 1px solid {{line}}">
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: {{tint}}; color: {{tintTx}}; font-size: 15px; font-weight: 800">BD</span>
+<span style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+<span style="font-size: 17px; font-weight: 700; letter-spacing: -0.01em">Bases de Datos II</span>
+<span style="font-size: 13px; color: {{mut}}">Has ido a 11 de 12 clases</span>
+</span>
+</div>
+<span role="img" aria-label="11 clases asistidas y 1 falta" style="display: flex; gap: 5px">
+<sc-for list="{{histA}}" as="d" hint-placeholder-count="12">
+<span style="width: 12px; height: 12px; border-radius: 999px; background: {{d.fill}}"></span>
+</sc-for>
+</span>
+<a href="B-Est-Marcar.dc.html" style="height: 50px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 14px; background: {{pri}}; color: {{onpri}}; text-decoration: none; font-size: 15px; font-weight: 700">Marcar asistencia</a>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 22px; background: {{sf}}; border: 1px solid {{line}}">
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: {{tint}}; color: {{tintTx}}; font-size: 15px; font-weight: 800">IS</span>
+<span style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1">
+<span style="font-size: 17px; font-weight: 700; letter-spacing: -0.01em">Ingeniería de Software</span>
+<span style="font-size: 13px; color: {{mut}}">Has ido a 8 de 10 clases</span>
+</span>
+</div>
+<span role="img" aria-label="8 clases asistidas y 2 faltas" style="display: flex; gap: 5px">
+<sc-for list="{{histB}}" as="d" hint-placeholder-count="10">
+<span style="width: 12px; height: 12px; border-radius: 999px; background: {{d.fill}}"></span>
+</sc-for>
+</span>
+<a href="B-Est-Marcar.dc.html" style="height: 50px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 14px; background: {{tint}}; color: {{tintTx}}; text-decoration: none; font-size: 15px; font-weight: 700">Marcar asistencia</a>
+</div>
+
+</div>
+
+<div style="padding: 12px 20px 24px">
+<button style="width: 100%; height: 54px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 16px; background: transparent; border: 1.500px solid {{pri}}; color: {{priTx}}; font-family: 'Figtree', system-ui, sans-serif; font-size: 16px; font-weight: 700; cursor: pointer">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linejoin="round"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="11" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="11" width="5" height="5" rx="1"></rect><path d="M11 11h2v2h-2zM14 14h2v2h-2z"></path></svg>
+Unirme a una clase
+</button>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const dark = this.props.dark ?? false;
+const t = dark
+? { bg: '#0C1719', sf: '#142326', ink: '#EEF5F6', mut: '#9DB3B7', line: '#24383C', pri: '#4CA4B0', onpri: '#06181B', priTx: '#7CC7D1', veil: 'rgba(6,24,27,0.16)', tint: '#18363B', tintTx: '#8BD0DA', manBg: '#3A2C12', manTx: '#F0BE72', noBg: '#3B1E19', noTx: '#F0958A' }
+: { bg: '#F3F6F6', sf: '#FFFFFF', ink: '#10262B', mut: '#51666B', line: '#DDE5E6', pri: '#1F7A87', onpri: '#FFFFFF', priTx: '#17616C', veil: 'rgba(255,255,255,0.22)', tint: '#E3F1F3', tintTx: '#17616C', manBg: '#FCF1DD', manTx: '#7A4E08', noBg: '#FBE9E6', noTx: '#A23A2B' };
+const hist = (n, missed) => {
+const out = [];
+for (let i = 0; i < n; i++) out.push({ fill: missed.indexOf(i) >= 0 ? '#D46454' : '#4CA4B0' });
+return out;
+};
+return Object.assign({ histA: hist(12, [6]), histB: hist(10, [2, 7]) }, t);
+}
+}
+</script>
+</body>
+</html>

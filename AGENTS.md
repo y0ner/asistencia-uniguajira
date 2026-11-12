@@ -57,8 +57,9 @@ trabajo y se pregunta al agente jefe.
    (`catch (_) {}` sin informar al usuario ni registrar el error).
 6. **Pruebas:** cada cambio de lógica en `lib/core/` o `lib/data/` llega con
    su prueba en `test/`.
-7. **Diseño:** las pantallas usan los tokens de `lib/theme/` (colores,
-   espaciados, radios). Nada de colores ni medidas sueltas.
+7. **Diseño:** toda pantalla se construye con el sistema de diseño de
+   `lib/ui` siguiendo `docs/diseno/SISTEMA.md`. Nada de colores, tamaños de
+   letra ni medidas sueltas, y nada de `lib/theme` en pantallas migradas.
 8. **Idioma:** comentarios, mensajes al usuario y commits en español.
 
 ### Alcance prohibido (no se implementa nunca)
