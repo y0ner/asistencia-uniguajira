@@ -551,10 +551,15 @@ class _CourseStudentsScreenState extends State<_CourseStudentsScreen> {
                   borderRadius: BorderRadius.circular(UiRadius.md),
                   border: Border.all(color: c.line),
                 ),
-                child: QrImageView(
+                // Tamaño fijo: AlertDialog mide a sus hijos antes de dibujarlos y
+                // QrImageView no puede dar su tamaño por adelantado (sin esto el
+                // diálogo falla y no se abre).
+                child: SizedBox.square(
+                  dimension: 240,
+                  child: QrImageView(
                   data: payload,
                   version: QrVersions.auto,
-                  size: 200.0,
+                  size: 240.0,
                   eyeStyle: QrEyeStyle(
                     eyeShape: QrEyeShape.square,
                     color: UiColors.light.ink,
@@ -563,6 +568,7 @@ class _CourseStudentsScreenState extends State<_CourseStudentsScreen> {
                     dataModuleShape: QrDataModuleShape.square,
                     color: UiColors.light.ink,
                   ),
+                ),
                 ),
               ),
               const SizedBox(height: UiSpace.md),
