@@ -6,12 +6,12 @@ import 'package:flutter/services.dart';
 
 import '../../core/models/course_model.dart';
 import '../../data/services/roster_import_service.dart';
-import '../../theme/theme.dart';
+import '../../ui/ui.dart';
 
-/// Modal institucional con 3 pestañas para la ingesta de estudiantes a un curso:
+/// Modal para agregar estudiantes a una clase mediante tres vías:
 /// 1) Pegar lista desde el portapapeles.
-/// 2) Importar archivo (.csv / .xlsx).
-/// 3) Registro manual individual.
+/// 2) Desde archivo (.csv / .xlsx).
+/// 3) Uno por uno (individual).
 class RosterImportModal extends StatefulWidget {
   const RosterImportModal({
     super.key,
@@ -22,15 +22,11 @@ class RosterImportModal extends StatefulWidget {
   final CourseModel course;
   final RosterImportService? rosterService;
 
-  /// Abre el modal inferior responsivo y devuelve `true` si se importó algún registro.
+  /// Abre la hoja modal y devuelve `true` si se agregó algún estudiante.
   static Future<bool?> show(BuildContext context, CourseModel course) {
-    final radii = AppRadii.of(context);
-    return showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: radii.modalShape(),
-      builder: (BuildContext ctx) => RosterImportModal(course: course),
+    return showUiSheet<bool>(
+      context,
+      builder: (_) => RosterImportModal(course: course),
     );
   }
 
@@ -38,20 +34,23 @@ class RosterImportModal extends StatefulWidget {
   State<RosterImportModal> createState() => _RosterImportModalState();
 }
 
+enum _ImportOption { clipboard, file, manual }
+
 class _RosterImportModalState extends State<RosterImportModal> {
   late final RosterImportService _rosterService;
 
+  _ImportOption _selectedOption = _ImportOption.clipboard;
   bool _isLoading = false;
   bool _hasChanges = false;
 
-  // Controladores de Pestaña 1 (Portapapeles)
+  // Pegar lista
   final TextEditingController _clipboardController = TextEditingController();
 
-  // Estado de Pestaña 2 (Archivo)
+  // Desde archivo
   PlatformFile? _selectedFile;
   int? _selectedFileSize;
 
-  // Controladores de Pestaña 3 (Manual)
+  // Uno por uno
   final GlobalKey<FormState> _manualFormKey = GlobalKey<FormState>();
   final TextEditingController _manualCodeController = TextEditingController();
   final TextEditingController _manualNameController = TextEditingController();
@@ -80,21 +79,11 @@ class _RosterImportModalState extends State<RosterImportModal> {
         _clipboardController.text = text;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Texto pegado desde el portapapeles.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showUiSnack(context, 'Texto pegado del portapapeles.');
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('El portapapeles está vacío o no contiene texto.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showUiSnack(context, 'El portapapeles está vacío.');
       }
     }
   }
@@ -102,12 +91,7 @@ class _RosterImportModalState extends State<RosterImportModal> {
   Future<void> _processClipboard() async {
     final rawText = _clipboardController.text.trim();
     if (rawText.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ingresa o pega las filas de estudiantes antes de procesar.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      showUiSnack(context, 'Pega o escribe los datos antes de continuar.');
       return;
     }
 
@@ -119,18 +103,10 @@ class _RosterImportModalState extends State<RosterImportModal> {
       );
       _hasChanges = true;
       if (!mounted) return;
-      _showSummaryDialog(
-        title: 'Importación desde Portapapeles',
-        result: result,
-      );
+      _showSummaryDialog(result);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al procesar el texto: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      showUiSnack(context, 'No se pudo procesar la lista.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -153,21 +129,14 @@ class _RosterImportModalState extends State<RosterImportModal> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al seleccionar archivo: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      showUiSnack(context, 'No se pudo seleccionar el archivo.');
     }
   }
 
   Future<void> _processFile() async {
     final file = _selectedFile;
     if (file == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Primero selecciona un archivo .csv o .xlsx.')),
-      );
+      showUiSnack(context, 'Selecciona un archivo .xlsx o .csv.');
       return;
     }
 
@@ -178,35 +147,33 @@ class _RosterImportModalState extends State<RosterImportModal> {
 
       RosterImportResult result;
       if (ext == 'xlsx') {
-        result = await _rosterService.importFromExcelBytes(widget.course.id, bytes);
+        result = await _rosterService.importFromExcelBytes(
+          widget.course.id,
+          bytes,
+        );
       } else if (ext == 'csv') {
         final csvString = utf8.decode(bytes, allowMalformed: true);
-        result = await _rosterService.importFromCsvString(widget.course.id, csvString);
+        result = await _rosterService.importFromCsvString(
+          widget.course.id,
+          csvString,
+        );
       } else {
-        throw FormatException('Formato .$ext no soportado. Debe ser .csv o .xlsx');
+        throw FormatException('Formato no admitido.');
       }
 
       _hasChanges = true;
       if (!mounted) return;
-      _showSummaryDialog(
-        title: 'Importación desde Archivo',
-        result: result,
-      );
+      _showSummaryDialog(result);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al importar el archivo: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      showUiSnack(context, 'No se pudo importar el archivo.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _submitManual() async {
-    if (!_manualFormKey.currentState!.validate()) return;
+    if (!_manualFormKey.currentState!.validate() || _isLoading) return;
 
     setState(() => _isLoading = true);
     try {
@@ -229,93 +196,53 @@ class _RosterImportModalState extends State<RosterImportModal> {
       _manualEmailController.clear();
 
       if (!mounted) return;
-      final colors = AppColors.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Estudiante ${student.fullName} registrado en Bit #${student.bitIndex.toString().padLeft(2, '0')}.',
-          ),
-          backgroundColor: colors.statusNormal,
-        ),
-      );
+      showUiSnack(context, 'Se agregó a ${student.fullName}.');
     } catch (e) {
       if (!mounted) return;
-      final colors = AppColors.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al registrar estudiante: $e'),
-          backgroundColor: colors.statusPerdida,
-        ),
-      );
+      showUiSnack(context, 'No se pudo agregar al estudiante.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _showSummaryDialog({
-    required String title,
-    required RosterImportResult result,
-  }) {
-    final colors = AppColors.of(context);
-    final radii = AppRadii.of(context);
-    final spacing = AppSpacing.of(context);
-
+  void _showSummaryDialog(RosterImportResult result) {
+    final c = UiColors.of(context);
     showDialog<void>(
       context: context,
       builder: (BuildContext ctx) {
         return AlertDialog(
-          shape: radii.dialogShape(),
-          title: Row(
-            children: <Widget>[
-              Icon(Icons.check_circle_outline, color: colors.statusNormal),
-              SizedBox(width: spacing.xs),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(fontSize: 18),
-                ),
-              ),
-            ],
-          ),
+          title: const Text('Estudiantes agregados'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
+            children: [
               Text(
-                'Resumen de procesamiento:',
-                style: Theme.of(ctx).textTheme.titleSmall,
+                'Se agregaron ${result.insertedCount} estudiantes.',
+                style: UiText.bodyStrong.copyWith(color: c.ink),
               ),
-              SizedBox(height: spacing.sm),
-              _ResultRow(
-                icon: Icons.check,
-                color: colors.statusNormal,
-                label: 'Estudiantes insertados:',
-                value: '${result.insertedCount}',
-              ),
-              SizedBox(height: spacing.xs),
-              _ResultRow(
-                icon: Icons.copy,
-                color: colors.statusAlerta,
-                label: 'Duplicados omitidos:',
-                value: '${result.duplicatesSkipped}',
-              ),
-              SizedBox(height: spacing.xs),
-              _ResultRow(
-                icon: Icons.cancel_outlined,
-                color: colors.statusPerdida,
-                label: 'Filas inválidas / sin cupo:',
-                value: '${result.invalidRowsSkipped}',
-              ),
+              if (result.duplicatesSkipped > 0) ...[
+                const SizedBox(height: UiSpace.sm),
+                Text(
+                  'Se omitieron ${result.duplicatesSkipped} porque ya estaban en la clase.',
+                  style: UiText.body.copyWith(color: c.muted),
+                ),
+              ],
+              if (result.invalidRowsSkipped > 0) ...[
+                const SizedBox(height: UiSpace.sm),
+                Text(
+                  'Se omitieron ${result.invalidRowsSkipped} por datos incompletos o falta de cupo.',
+                  style: UiText.body.copyWith(color: c.absentText),
+                ),
+              ],
             ],
           ),
-          actions: <Widget>[
+          actions: [
             FilledButton(
-              style: FilledButton.styleFrom(shape: radii.buttonShape()),
               onPressed: () {
                 Navigator.of(ctx).pop();
                 Navigator.of(context).pop(_hasChanges);
               },
-              child: const Text('Cerrar y Ver Roster'),
+              child: const Text('Ver estudiantes'),
             ),
           ],
         );
@@ -323,435 +250,214 @@ class _RosterImportModalState extends State<RosterImportModal> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
-    final spacing = AppSpacing.of(context);
-    final radii = AppRadii.of(context);
-    final viewInsets = MediaQuery.of(context).viewInsets;
+  Widget _buildClipboardContent(UiColors c) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            UiButton(
+              label: 'Pegar del portapapeles',
+              icon: Icons.content_paste_rounded,
+              variant: UiButtonVariant.tonal,
+              compact: true,
+              expand: false,
+              onPressed: _pasteFromSystemClipboard,
+            ),
+          ],
+        ),
+        const SizedBox(height: UiSpace.sm),
+        TextField(
+          controller: _clipboardController,
+          maxLines: 6,
+          minLines: 3,
+          decoration: const InputDecoration(
+            hintText: '0123456789  JUAN PEREZ  jperez@uniguajira.edu.co\n'
+                '0987654321  MARIA GOMEZ  mgomez@uniguajira.edu.co',
+          ),
+        ),
+        const SizedBox(height: UiSpace.xl),
+        UiButton(
+          label: 'Agregar estudiantes',
+          icon: Icons.add_rounded,
+          loading: _isLoading,
+          onPressed: _processClipboard,
+        ),
+      ],
+    );
+  }
 
-    return DefaultTabController(
-      length: 3,
-      child: Padding(
-        padding: spacing.only(bottom: viewInsets.bottom),
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height * 0.85,
+  Widget _buildFileContent(UiColors c) {
+    final file = _selectedFile;
+    final size = _selectedFileSize;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        UiCard(
+          onTap: _pickFile,
           child: Column(
-            children: <Widget>[
-              // Barra de arrastre y título
-              Padding(
-                padding: spacing.fromLTRB(spacing.md, spacing.sm, spacing.md, spacing.xs),
-                child: Row(
-                  children: <Widget>[
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: colors.onSurfaceMuted.withValues(alpha: 0.4),
-                        borderRadius: radii.borderXs,
-                      ),
-                    ),
-                  ],
-                ),
+            children: [
+              Icon(
+                file != null
+                    ? Icons.description_rounded
+                    : Icons.cloud_upload_outlined,
+                size: 40,
+                color: c.primary,
               ),
-              Padding(
-                padding: spacing.symmetric(horizontal: spacing.lg),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: <Widget>[
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                            'Cargar Estudiantes',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colors.primary,
-                            ),
-                          ),
-                          Text(
-                            '${widget.course.name} (${widget.course.code} - G${widget.course.groupCode})',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colors.onSurfaceMuted,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(_hasChanges),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: UiSpace.sm),
+              Text(
+                file != null
+                    ? file.name
+                    : 'Toca para seleccionar archivo',
+                style: UiText.bodyStrong.copyWith(color: c.ink),
+                textAlign: TextAlign.center,
               ),
-              SizedBox(height: spacing.xs),
-
-              // Pestañas
-              TabBar(
-                labelColor: colors.primary,
-                unselectedLabelColor: colors.onSurfaceMuted,
-                indicatorColor: colors.primary,
-                tabs: const <Widget>[
-                  Tab(
-                    icon: Icon(Icons.content_paste_outlined),
-                    text: 'Pegar Lista',
-                  ),
-                  Tab(
-                    icon: Icon(Icons.upload_file_outlined),
-                    text: 'Archivo',
-                  ),
-                  Tab(
-                    icon: Icon(Icons.person_add_alt_1_outlined),
-                    text: 'Manual',
-                  ),
-                ],
-              ),
-
-              // Contenido de las pestañas
-              Expanded(
-                child: _isLoading
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            const CircularProgressIndicator(),
-                            SizedBox(height: spacing.md),
-                            const Text('Procesando datos del curso...'),
-                          ],
-                        ),
-                      )
-                    : TabBarView(
-                        children: <Widget>[
-                          _buildClipboardTab(theme),
-                          _buildFileTab(theme),
-                          _buildManualTab(theme),
-                        ],
-                      ),
+              const SizedBox(height: UiSpace.xs),
+              Text(
+                file != null && size != null
+                    ? '${(size / 1024).toStringAsFixed(1)} KB'
+                    : 'Formatos admitidos: .xlsx, .csv',
+                style: UiText.caption.copyWith(color: c.muted),
               ),
             ],
           ),
         ),
+        const SizedBox(height: UiSpace.xl),
+        UiButton(
+          label: 'Agregar desde archivo',
+          icon: Icons.add_rounded,
+          loading: _isLoading,
+          onPressed: file != null ? _processFile : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildManualContent(UiColors c) {
+    return Form(
+      key: _manualFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _manualCodeController,
+            decoration: const InputDecoration(
+              labelText: 'Código del estudiante',
+              hintText: '0123456789',
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Escribe el código';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: UiSpace.md),
+          TextFormField(
+            controller: _manualNameController,
+            decoration: const InputDecoration(
+              labelText: 'Nombre completo',
+              hintText: 'Juan Pérez',
+            ),
+            textCapitalization: TextCapitalization.words,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Escribe el nombre';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: UiSpace.md),
+          TextFormField(
+            controller: _manualEmailController,
+            decoration: const InputDecoration(
+              labelText: 'Correo electrónico (opcional)',
+              hintText: 'usuario@uniguajira.edu.co',
+            ),
+            keyboardType: TextInputType.emailAddress,
+          ),
+          const SizedBox(height: UiSpace.xl),
+          UiButton(
+            label: 'Agregar estudiante',
+            icon: Icons.person_add_rounded,
+            loading: _isLoading,
+            onPressed: _submitManual,
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildClipboardTab(ThemeData theme) {
-    return Builder(
-      builder: (BuildContext context) {
-        final colors = AppColors.of(context);
-        final spacing = AppSpacing.of(context);
-        final radii = AppRadii.of(context);
-
-        return SingleChildScrollView(
-          padding: spacing.insetsCard,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Container(
-                padding: spacing.insetsSm,
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHigh.withValues(alpha: 0.5),
-                  borderRadius: radii.borderMd,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Icon(
-                      Icons.info_outline,
-                      size: 20,
-                      color: colors.primary,
-                    ),
-                    SizedBox(width: spacing.xs),
-                    Expanded(
-                      child: Text(
-                        'Pega filas copiadas de Excel o SMA. Se admiten columnas separadas '
-                        'por tabulador, punto y coma, coma o guion. La fila de títulos se '
-                        'detecta automáticamente.',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: spacing.sm),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: <Widget>[
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(shape: radii.buttonShape()),
-                    onPressed: _pasteFromSystemClipboard,
-                    icon: const Icon(Icons.paste, size: 18),
-                    label: const Text('Pegar Portapapeles'),
-                  ),
-                ],
-              ),
-              SizedBox(height: spacing.xs),
-              TextField(
-                controller: _clipboardController,
-                maxLines: 8,
-                minLines: 5,
-                decoration: InputDecoration(
-                  hintText: 'Ejemplo:\n0123456789\tPEREZ JUAN\tjperez@uniguajira.edu.co\n'
-                      '0987654321\tGOMEZ MARIA\tmgomez@uniguajira.edu.co',
-                  border: OutlineInputBorder(
-                    borderRadius: radii.borderMd,
-                  ),
-                  filled: true,
-                ),
-              ),
-              SizedBox(height: spacing.md),
-              FilledButton.icon(
-                onPressed: _processClipboard,
-                icon: const Icon(Icons.bolt),
-                label: const Text('Procesar e Importar Roster'),
-                style: FilledButton.styleFrom(
-                  padding: spacing.insetsVMd,
-                  shape: radii.buttonShape(),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFileTab(ThemeData theme) {
-    return Builder(
-      builder: (BuildContext context) {
-        final colors = AppColors.of(context);
-        final spacing = AppSpacing.of(context);
-        final radii = AppRadii.of(context);
-        final file = _selectedFile;
-        final size = _selectedFileSize;
-
-        return SingleChildScrollView(
-          padding: spacing.insetsCard,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Container(
-                padding: spacing.insetsSm,
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHigh.withValues(alpha: 0.5),
-                  borderRadius: radii.borderMd,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Icon(
-                      Icons.info_outline,
-                      size: 20,
-                      color: colors.primary,
-                    ),
-                    SizedBox(width: spacing.xs),
-                    Expanded(
-                      child: Text(
-                        'Carga una lista en formato CSV (.csv) o un libro de Excel (.xlsx). '
-                        'Los códigos de estudiante conservan los ceros iniciales intactos.',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: spacing.lg),
-
-              // Selector visual de archivo
-              InkWell(
-                onTap: _pickFile,
-                borderRadius: radii.borderLg,
-                child: Container(
-                  padding: spacing.symmetric(vertical: spacing.lg, horizontal: spacing.md),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: file != null
-                          ? colors.primary
-                          : colors.outlineVariant,
-                      width: 2,
-                    ),
-                    borderRadius: radii.borderLg,
-                    color: file != null
-                        ? colors.primaryContainer.withValues(alpha: 0.2)
-                        : colors.surface,
-                  ),
-                  child: Column(
-                    children: <Widget>[
-                      Icon(
-                        file != null
-                            ? Icons.insert_drive_file
-                            : Icons.cloud_upload_outlined,
-                        size: 48,
-                        color: file != null
-                            ? colors.primary
-                            : colors.onSurfaceMuted,
-                      ),
-                      SizedBox(height: spacing.sm),
-                      Text(
-                        file != null ? file.name : 'Toca para seleccionar archivo',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: spacing.xxs),
-                      Text(
-                        file != null && size != null
-                            ? '${(size / 1024).toStringAsFixed(1)} KB'
-                            : 'Formatos admitidos: .csv, .xlsx',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: spacing.lg),
-
-              FilledButton.icon(
-                onPressed: file != null ? _processFile : null,
-                icon: const Icon(Icons.file_download_done),
-                label: const Text('Importar Archivo'),
-                style: FilledButton.styleFrom(
-                  padding: spacing.insetsVMd,
-                  shape: radii.buttonShape(),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildManualTab(ThemeData theme) {
-    return Builder(
-      builder: (BuildContext context) {
-        final colors = AppColors.of(context);
-        final spacing = AppSpacing.of(context);
-        final radii = AppRadii.of(context);
-
-        return SingleChildScrollView(
-          padding: spacing.insetsCard,
-          child: Form(
-            key: _manualFormKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Text(
-                  'Registra individualmente a un estudiante. El sistema le asignará '
-                  'automáticamente el siguiente bit libre (0..63) y su secreto HMAC.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colors.onSurfaceMuted,
-                  ),
-                ),
-                SizedBox(height: spacing.md),
-                TextFormField(
-                  controller: _manualCodeController,
-                  keyboardType: TextInputType.text,
-                  decoration: InputDecoration(
-                    labelText: 'Código Estudiantil *',
-                    hintText: '0123456789 (preserva ceros)',
-                    prefixIcon: const Icon(Icons.badge_outlined),
-                    border: OutlineInputBorder(borderRadius: radii.borderMd),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'El código es obligatorio';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: spacing.md),
-                TextFormField(
-                  controller: _manualNameController,
-                  keyboardType: TextInputType.name,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    labelText: 'Nombre Completo *',
-                    hintText: 'Ej. ALVARO JOSE LOPEZ GUERRA',
-                    prefixIcon: const Icon(Icons.person_outline),
-                    border: OutlineInputBorder(borderRadius: radii.borderMd),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'El nombre es obligatorio';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: spacing.md),
-                TextFormField(
-                  controller: _manualEmailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'Correo Institucional (Opcional)',
-                    hintText: 'usuario@uniguajira.edu.co',
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(borderRadius: radii.borderMd),
-                  ),
-                ),
-                SizedBox(height: spacing.lg),
-                FilledButton.icon(
-                  onPressed: _submitManual,
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Registrar Estudiante'),
-                  style: FilledButton.styleFrom(
-                    padding: spacing.insetsVMd,
-                    shape: radii.buttonShape(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ResultRow extends StatelessWidget {
-  const _ResultRow({
-    required this.icon,
-    required this.color,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String label;
-  final String value;
-
   @override
   Widget build(BuildContext context) {
-    final spacing = AppSpacing.of(context);
+    final c = UiColors.of(context);
 
-    return Row(
-      children: <Widget>[
-        Icon(icon, size: 18, color: color),
-        SizedBox(width: spacing.xs),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w500),
+    final String explanation = switch (_selectedOption) {
+      _ImportOption.clipboard =>
+        'Copia la lista desde Excel o el SMA y pégala aquí.',
+      _ImportOption.file =>
+        'Copia o selecciona una lista en formato Excel (.xlsx) o CSV.',
+      _ImportOption.manual =>
+        'Escribe los datos del estudiante para agregarlo a la clase.',
+    };
+
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: UiSpace.sm),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Agregar estudiantes',
+                  style: UiText.h2.copyWith(color: c.ink),
+                ),
+              ),
+              UiRoundIconButton(
+                icon: Icons.close_rounded,
+                tooltip: 'Cerrar',
+                onPressed: () => Navigator.of(context).pop(_hasChanges),
+              ),
+            ],
           ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: color,
-            fontSize: 16,
+          const SizedBox(height: UiSpace.md),
+          UiFilterPills<_ImportOption>(
+            options: const [
+              UiFilterOption(
+                value: _ImportOption.clipboard,
+                label: 'Pegar lista',
+              ),
+              UiFilterOption(
+                value: _ImportOption.file,
+                label: 'Desde archivo',
+              ),
+              UiFilterOption(
+                value: _ImportOption.manual,
+                label: 'Uno por uno',
+              ),
+            ],
+            selected: _selectedOption,
+            onSelected: (option) {
+              setState(() => _selectedOption = option);
+            },
           ),
-        ),
-      ],
+          const SizedBox(height: UiSpace.md),
+          Text(
+            explanation,
+            style: UiText.body.copyWith(color: c.muted),
+          ),
+          const SizedBox(height: UiSpace.lg),
+          switch (_selectedOption) {
+            _ImportOption.clipboard => _buildClipboardContent(c),
+            _ImportOption.file => _buildFileContent(c),
+            _ImportOption.manual => _buildManualContent(c),
+          },
+        ],
+      ),
     );
   }
 }
