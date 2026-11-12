@@ -1,4 +1,12 @@
-# Asistencia Multimodal Uniguajira (`asistencia_uniguajira`)
+<div align="center">
+
+![Asistencia Uniguajira Banner](https://capsule-render.vercel.app/api?type=waving&color=1e293b&height=250&section=header&text=Asistencia%20Uniguajira&fontSize=60&fontColor=ffffff&animation=fadeIn&fontAlignY=35&desc=Asistencia%20offline-first%20con%20BLE%20%C2%B7%20Universidad%20de%20La%20Guajira&descAlignY=55&descSize=20)
+
+[![Estado del Proyecto](https://img.shields.io/badge/Estado-En%20desarrollo-success?style=for-the-badge)](https://github.com/y0ner/asistencia-uniguajira)
+[![Mantenimiento](https://img.shields.io/badge/Mantenimiento-Continuo-blue?style=for-the-badge)](https://github.com/y0ner/asistencia-uniguajira)
+[![Stack](https://img.shields.io/badge/Stack-Flutter%20%C2%B7%20SQLite%20%C2%B7%20BLE-orange?style=for-the-badge)](https://github.com/y0ner/asistencia-uniguajira)
+
+</div>
 
 **Universidad de La Guajira** · Facultad de Ingeniería · Programa de Ingeniería de Sistemas  
 **Proyecto de Grado:** Yoner De Jesus Isaza Vides (`0182120016`) y Álvaro Luis Garrido Medina (`0182110072`)  
@@ -32,4 +40,11 @@ Aplicación móvil multiplataforma desarrollada en **Flutter** con arquitectura 
 flutter pub get
 flutter analyze
 flutter test
-flutter run```
+flutter run
+```
+
+---
+
+<div align="center">
+  <i>Desarrollado y mantenido con estándares de calidad técnica por <a href="https://github.com/y0ner">y0ner</a></i>
+</div>
