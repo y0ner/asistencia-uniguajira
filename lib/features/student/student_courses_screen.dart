@@ -36,7 +36,6 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   List<StudentEnrollmentModel> _enrollments = <StudentEnrollmentModel>[];
-  Map<String, String> _courseGroups = <String, String>{};
 
   @override
   void initState() {
@@ -55,20 +54,10 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
 
     try {
       final enrollments = await _enrollmentService.getEnrolledCourses();
-      final groups = <String, String>{};
-      for (final e in enrollments) {
-        try {
-          final course = await _database.getCourseById(e.courseId);
-          if (course != null && course.groupCode.isNotEmpty) {
-            groups[e.courseId] = course.groupCode;
-          }
-        } catch (_) {}
-      }
 
       if (!mounted) return;
       setState(() {
         _enrollments = enrollments;
-        _courseGroups = groups;
         _isLoading = false;
       });
     } catch (e, st) {
@@ -192,13 +181,9 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
     }
   }
 
-  String _buildSubtitle(StudentEnrollmentModel enrollment) {
-    final group = _courseGroups[enrollment.courseId];
-    if (group != null && group.isNotEmpty) {
-      return '${enrollment.courseCode} · Grupo $group';
-    }
-    return enrollment.courseCode;
-  }
+  // El celular del estudiante no guarda las clases del docente: solo se
+  // conoce el código que trae la inscripción.
+  String _buildSubtitle(StudentEnrollmentModel enrollment) => enrollment.courseCode;
 
   String _computeOverline(DateTime now) {
     if (_enrollments.isNotEmpty) {
@@ -238,7 +223,7 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
                     Text(
                       enrollment.courseName,
                       style: UiText.title.copyWith(color: c.ink),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),

@@ -76,6 +76,8 @@ void main() {
   test('las iniciales salen de las dos primeras palabras', () {
     expect(UiAvatar.initialsOf('Ana Lucía Pérez'), 'AL');
     expect(UiAvatar.initialsOf('  josé  '), 'J');
+    expect(UiAvatar.initialsOf('Ingeniería de Software'), 'IS');
+    expect(UiAvatar.initialsOf('Bases de Datos II'), 'BD');
     expect(UiAvatar.initialsOf(''), '?');
   });
 
