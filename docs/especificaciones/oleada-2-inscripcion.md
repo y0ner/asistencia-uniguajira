@@ -122,7 +122,7 @@ La firma con `deviceSecret` confirma que ambos calcularon el mismo secreto. El d
   - `origin`: `roster` (lista) | `added_in_class` (agregado en clase).
   - `device_key_id` (huella de la clave del celular) y `device_bound_at`; nulos = sin celular vinculado.
   - `retired_at`.
-  - `bit_index` pasa a ser nulo en los retirados (libera la casilla).
+  - Los retirados **conservan su casilla** (no se reutiliza): así no se toca el historial firmado y, si vuelven, recuperan su lugar. El cupo de 64 cuenta activos y retirados.
 - Celular del estudiante: `student_enrollments` guarda su par de claves y el `deviceSecret`. `student_id` se calcula localmente (`courseId:código`).
 - Los datos de prueba actuales se descartan (no hay piloto en curso).
 

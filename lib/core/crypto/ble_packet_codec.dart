@@ -57,6 +57,10 @@ abstract final class BlePacketCodec {
   /// Cabecera de los paquetes de eco emitidos por el docente.
   static const int teacherPacketFlag = 0x00;
 
+  /// Bit que marca los paquetes de inscripción (ver `EnrollmentPacketCodec`).
+  /// Los verificadores de asistencia los ignoran.
+  static const int enrollmentPacketFlag = 0x40;
+
   /// Longitud fija de cualquier paquete del protocolo.
   static const int packetLength = 16;
 
@@ -138,6 +142,12 @@ abstract final class BlePacketCodec {
       return const StudentBeaconVerificationResult(
         isValid: false,
         failureReason: 'El paquete no es un anuncio de estudiante.',
+      );
+    }
+    if ((packet16[2] & enrollmentPacketFlag) != 0) {
+      return const StudentBeaconVerificationResult(
+        isValid: false,
+        failureReason: 'El paquete es de inscripción, no de asistencia.',
       );
     }
     if (clockSkewToleranceTicks < 0) {
@@ -288,6 +298,12 @@ abstract final class BlePacketCodec {
       return const TeacherEchoVerificationResult(
         isValid: false,
         failureReason: 'El paquete no es un eco del docente.',
+      );
+    }
+    if ((packet16[2] & enrollmentPacketFlag) != 0) {
+      return const TeacherEchoVerificationResult(
+        isValid: false,
+        failureReason: 'El paquete es de inscripción, no un eco de asistencia.',
       );
     }
 
