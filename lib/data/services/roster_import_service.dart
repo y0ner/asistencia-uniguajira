@@ -122,7 +122,7 @@ class RosterImportService {
       );
     }
 
-    final existing = await _database.getStudentsByCourse(courseId);
+    final existing = await _database.getAllStudentsByCourse(courseId);
     if (existing.length >= AppConstants.bitmapBitCount) {
       throw StateError(
         'El curso $courseId ya ocupó las '
@@ -203,7 +203,7 @@ class RosterImportService {
       );
     }
 
-    final existing = await _database.getStudentsByCourse(courseId);
+    final existing = await _database.getAllStudentsByCourse(courseId);
     final existingCodes = existing
         .map((StudentModel student) => student.studentCode.trim())
         .toSet();

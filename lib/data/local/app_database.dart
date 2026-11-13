@@ -103,6 +103,27 @@ class AppDatabase {
         definition: 'TEXT',
       );
     }
+    if (oldVersion < 4) {
+      // Oleada 2: inscripción con un QR de clase, vínculo de celular y retiro.
+      for (final column in const <String>['enroll_private_key', 'enroll_public_key']) {
+        await _ensureColumn(db, table: _coursesTable, column: column, definition: 'TEXT');
+      }
+      await _ensureColumn(
+        db,
+        table: _studentsTable,
+        column: 'status',
+        definition: "TEXT NOT NULL DEFAULT '${AppConstants.studentStatusActive}'",
+      );
+      await _ensureColumn(
+        db,
+        table: _studentsTable,
+        column: 'origin',
+        definition: "TEXT NOT NULL DEFAULT '${AppConstants.studentOriginRoster}'",
+      );
+      for (final column in const <String>['device_key_id', 'device_bound_at', 'retired_at']) {
+        await _ensureColumn(db, table: _studentsTable, column: column, definition: 'TEXT');
+      }
+    }
   }
 
   static Future<void> _ensureColumn(
@@ -201,11 +222,142 @@ class AppDatabase {
     final db = await database;
     final rows = await db.query(
       _studentsTable,
+      where: 'course_id = ? AND status = ?',
+      whereArgs: <Object?>[courseId, AppConstants.studentStatusActive],
+      orderBy: 'bit_index ASC',
+    );
+    return rows.map(StudentModel.fromMap).toList(growable: false);
+  }
+
+  /// Activos y retirados de la clase, por casilla. Los retirados conservan su
+  /// casilla (no se reutiliza) para no romper el historial firmado.
+  Future<List<StudentModel>> getAllStudentsByCourse(String courseId) async {
+    final db = await database;
+    final rows = await db.query(
+      _studentsTable,
       where: 'course_id = ?',
       whereArgs: <Object?>[courseId],
       orderBy: 'bit_index ASC',
     );
     return rows.map(StudentModel.fromMap).toList(growable: false);
+  }
+
+  Future<StudentModel?> getStudentById(String studentId) async {
+    final db = await database;
+    final rows = await db.query(_studentsTable, where: 'id = ?', whereArgs: <Object?>[studentId], limit: 1);
+    return rows.isEmpty ? null : StudentModel.fromMap(rows.first);
+  }
+
+  /// Cuántas asistencias tiene registradas un estudiante (define si se puede
+  /// eliminar o solo retirar).
+  Future<int> countAttendanceByStudent(String studentId) async {
+    final db = await database;
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS total FROM $_attendanceRecordsTable WHERE student_id = ?',
+      <Object?>[studentId],
+    );
+    return Sqflite.firstIntValue(rows) ?? 0;
+  }
+
+  /// Vincula un celular: guarda su secreto y la huella de su clave.
+  Future<void> bindStudentDevice({
+    required String studentId,
+    required String deviceSecretHex,
+    required String deviceKeyId,
+    required String boundAt,
+  }) async {
+    await _updateStudent(studentId, <String, Object?>{
+      'personal_secret': deviceSecretHex,
+      'device_key_id': deviceKeyId,
+      'device_bound_at': boundAt,
+    });
+  }
+
+  /// Desvincula el celular. [newSecretHex] reemplaza el secreto para que el
+  /// celular anterior deje de ser reconocido.
+  Future<void> unbindStudentDevice({required String studentId, required String newSecretHex}) async {
+    await _updateStudent(studentId, <String, Object?>{
+      'personal_secret': newSecretHex,
+      'device_key_id': null,
+      'device_bound_at': null,
+    });
+  }
+
+  /// Retira al estudiante: conserva su historial pero sale de las sesiones nuevas.
+  Future<void> retireStudent({
+    required String studentId,
+    required String retiredAt,
+    required String newSecretHex,
+  }) async {
+    await _updateStudent(studentId, <String, Object?>{
+      'status': AppConstants.studentStatusRetired,
+      'retired_at': retiredAt,
+      'personal_secret': newSecretHex,
+      'device_key_id': null,
+      'device_bound_at': null,
+    });
+  }
+
+  /// Devuelve a la clase a un estudiante retirado (sin celular vinculado).
+  Future<void> reactivateStudent(String studentId) async {
+    await _updateStudent(studentId, <String, Object?>{
+      'status': AppConstants.studentStatusActive,
+      'retired_at': null,
+    });
+  }
+
+  Future<void> updateStudentIdentity({
+    required String studentId,
+    required String fullName,
+    String? email,
+  }) async {
+    await _updateStudent(studentId, <String, Object?>{'full_name': fullName, 'email': email});
+  }
+
+  /// Borra al estudiante y, en cascada, sus asistencias. Úsalo solo si no
+  /// tiene asistencias; si las tiene, [retireStudent].
+  Future<void> deleteStudent(String studentId) async {
+    final db = await database;
+    await db.delete(_studentsTable, where: 'id = ?', whereArgs: <Object?>[studentId]);
+  }
+
+  Future<void> _updateStudent(String studentId, Map<String, Object?> values) async {
+    final db = await database;
+    final updated = await db.update(_studentsTable, values, where: 'id = ?', whereArgs: <Object?>[studentId]);
+    if (updated == 0) {
+      throw StateError('El estudiante $studentId no existe.');
+    }
+  }
+
+  /// Par de claves de inscripción de la clase (privada, pública) o nulo si aún no se creó.
+  Future<({String privateKeyHex, String publicKeyHex})?> getCourseEnrollKeys(String courseId) async {
+    final db = await database;
+    final rows = await db.query(
+      _coursesTable,
+      columns: <String>['enroll_private_key', 'enroll_public_key'],
+      where: 'id = ?',
+      whereArgs: <Object?>[courseId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final privateKey = rows.first['enroll_private_key'] as String?;
+    final publicKey = rows.first['enroll_public_key'] as String?;
+    if (privateKey == null || publicKey == null) return null;
+    return (privateKeyHex: privateKey, publicKeyHex: publicKey);
+  }
+
+  Future<void> setCourseEnrollKeys({
+    required String courseId,
+    required String privateKeyHex,
+    required String publicKeyHex,
+  }) async {
+    final db = await database;
+    await db.update(
+      _coursesTable,
+      <String, Object?>{'enroll_private_key': privateKeyHex, 'enroll_public_key': publicKeyHex},
+      where: 'id = ?',
+      whereArgs: <Object?>[courseId],
+    );
   }
 
   /// Busca un estudiante por su código dentro de un curso.
@@ -651,7 +803,9 @@ class AppDatabase {
       semester TEXT NOT NULL,
       course_secret TEXT NOT NULL,
       spreadsheet_id TEXT,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      enroll_private_key TEXT,
+      enroll_public_key TEXT
     )
   ''';
 
@@ -667,6 +821,11 @@ class AppDatabase {
         CHECK (bit_index >= 0 AND bit_index < ${AppConstants.bitmapBitCount}),
       personal_secret TEXT NOT NULL,
       enrolled_at TEXT,
+      status TEXT NOT NULL DEFAULT '${AppConstants.studentStatusActive}',
+      origin TEXT NOT NULL DEFAULT '${AppConstants.studentOriginRoster}',
+      device_key_id TEXT,
+      device_bound_at TEXT,
+      retired_at TEXT,
       UNIQUE (course_id, bit_index),
       UNIQUE (course_id, student_code),
       FOREIGN KEY (course_id) REFERENCES $_coursesTable (id) ON DELETE CASCADE

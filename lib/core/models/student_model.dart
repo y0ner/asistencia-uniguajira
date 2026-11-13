@@ -1,3 +1,5 @@
+import '../constants/app_constants.dart';
+
 /// Estudiante matriculado en un curso, con su posición fija en el Bitmap.
 class StudentModel {
   const StudentModel({
@@ -9,6 +11,11 @@ class StudentModel {
     required this.personalSecret,
     this.email,
     this.enrolledAt,
+    this.status = AppConstants.studentStatusActive,
+    this.origin = AppConstants.studentOriginRoster,
+    this.deviceKeyId,
+    this.deviceBoundAt,
+    this.retiredAt,
   });
 
   /// Construye el modelo a partir de una fila SQLite.
@@ -22,6 +29,11 @@ class StudentModel {
       bitIndex: map['bit_index']! as int,
       personalSecret: map['personal_secret']! as String,
       enrolledAt: map['enrolled_at'] as String?,
+      status: map['status'] as String? ?? AppConstants.studentStatusActive,
+      origin: map['origin'] as String? ?? AppConstants.studentOriginRoster,
+      deviceKeyId: map['device_key_id'] as String?,
+      deviceBoundAt: map['device_bound_at'] as String?,
+      retiredAt: map['retired_at'] as String?,
     );
   }
 
@@ -49,6 +61,30 @@ class StudentModel {
   /// Fecha de enrolamiento en formato ISO8601.
   final String? enrolledAt;
 
+  /// `active` o `retired` (ver [AppConstants.studentStatusActive]).
+  final String status;
+
+  /// `roster` (venía en la lista) o `added_in_class` (lo agregó el docente al inscribirse).
+  final String origin;
+
+  /// Huella de la clave del celular vinculado; nula si aún no tiene celular.
+  final String? deviceKeyId;
+
+  /// Cuándo se vinculó el celular (ISO 8601).
+  final String? deviceBoundAt;
+
+  /// Cuándo fue retirado de la clase (ISO 8601).
+  final String? retiredAt;
+
+  bool get isActive => status == AppConstants.studentStatusActive;
+
+  bool get isRetired => status == AppConstants.studentStatusRetired;
+
+  /// `true` si ya vinculó un celular con el flujo de inscripción.
+  bool get hasDevice => deviceKeyId != null && deviceKeyId!.isNotEmpty;
+
+  bool get wasAddedInClass => origin == AppConstants.studentOriginAddedInClass;
+
   /// Serializa el modelo a una fila SQLite.
   Map<String, Object?> toMap() {
     return <String, Object?>{
@@ -60,6 +96,11 @@ class StudentModel {
       'bit_index': bitIndex,
       'personal_secret': personalSecret,
       'enrolled_at': enrolledAt,
+      'status': status,
+      'origin': origin,
+      'device_key_id': deviceKeyId,
+      'device_bound_at': deviceBoundAt,
+      'retired_at': retiredAt,
     };
   }
 
@@ -73,6 +114,11 @@ class StudentModel {
     int? bitIndex,
     String? personalSecret,
     String? enrolledAt,
+    String? status,
+    String? origin,
+    String? deviceKeyId,
+    String? deviceBoundAt,
+    String? retiredAt,
   }) {
     return StudentModel(
       id: id ?? this.id,
@@ -83,6 +129,11 @@ class StudentModel {
       bitIndex: bitIndex ?? this.bitIndex,
       personalSecret: personalSecret ?? this.personalSecret,
       enrolledAt: enrolledAt ?? this.enrolledAt,
+      status: status ?? this.status,
+      origin: origin ?? this.origin,
+      deviceKeyId: deviceKeyId ?? this.deviceKeyId,
+      deviceBoundAt: deviceBoundAt ?? this.deviceBoundAt,
+      retiredAt: retiredAt ?? this.retiredAt,
     );
   }
 
