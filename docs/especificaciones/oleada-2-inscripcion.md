@@ -1,6 +1,6 @@
 # Oleada 2 · Inscripción con un solo QR de clase
 
-- **Estado:** propuesta para aprobación de Yoner (12 de noviembre de 2026).
+- **Estado:** aprobada por Yoner el 12 de noviembre de 2026.
 - **Reemplaza:** el QR individual por estudiante (el docente mostraba un QR por persona).
 - **No cambia:** la toma de asistencia (PIN → acercar → "¡Presente!"), ya probada con dos celulares reales.
 
@@ -14,14 +14,14 @@ Que toda una clase se inscriba en un par de minutos sin que el docente toque nad
 
 1. En la clase toca **"Inscribir estudiantes"**. La pantalla muestra **un QR de la clase** (se puede proyectar) y el contador "Inscritos 18 de 32".
 2. Deja la pantalla abierta. Los estudiantes de su lista entran **solos**.
-3. Si llega alguien que **no está en la lista**, aparece en **"Por aprobar"**. El docente lo toca, le pregunta nombre y correo, los escribe y toca **"Agregar y aceptar"** (o **"Rechazar"**).
+3. Si llega alguien que **no está en la lista**, aparece en **"Por aprobar"** con su código ("El código 0182120099 quiere unirse"). El docente pregunta en voz alta quién es, le pide nombre completo y correo, los escribe y toca **"Agregar y aceptar"** (o **"Rechazar"**).
 4. Si un código **ya tiene un celular vinculado**, aparece un aviso: "Ana Pérez ya tiene un celular vinculado. ¿Reemplazarlo por este?" → **Reemplazar** / **Rechazar**.
 5. Al cerrar la pantalla termina la inscripción; las solicitudes sin resolver se descartan.
 
 ### Estudiante
 
 1. **"Unirme a una clase"** → escanea el QR de la clase.
-2. Escribe **su código estudiantil** y lo confirma ("¿Tu código es 0182120016?").
+2. Escribe **su código estudiantil** (10 números) y **su nombre**. El nombre es solo para verlo él en su app: el registro oficial es el que tiene el docente.
 3. Ve "Buscando a tu profesor…" con el dibujo de los dos celulares. Debe estar **en el salón**: la respuesta llega por Bluetooth.
 4. Resultado:
    - **"¡Listo! Ya estás en Bases de Datos II."**
@@ -80,7 +80,7 @@ El par de claves del docente se crea una vez por clase y se guarda en la base de
 Mensaje de 44 bytes:
 
 ```
-código (6)  = [cantidad de dígitos:1][número big-endian:5]     (códigos numéricos de hasta 12 dígitos)
+código (6)  = [cantidad de dígitos:1][número big-endian:5]     (en la Uniguajira son 10 dígitos; el formato admite de 4 a 12)
 clave pública del estudiante (32)
 firma (6)   = HMAC-SHA256(sharedSecret, "ENR1" | reqId | código | clave)[0..6]
 ```
@@ -165,11 +165,12 @@ Los totales de las sesiones ya cerradas ("29 de 32") se toman de la sesión firm
 |---|---|
 | 30 celulares pidiendo inscripción a la vez | El docente responde en rotación; se probará con los celulares disponibles y se medirá el tiempo por estudiante. |
 | Rotar anuncios cada 400–600 ms en algunos Android | Ya se serializa detener → iniciar; se medirá en la prueba 02 y se ajusta el intervalo. |
-| Códigos con letras | Fuera de alcance: se valida que el código sea numérico (4 a 12 dígitos). |
+| Códigos con letras | No aplica: los códigos de la Uniguajira son de 10 números. Se valida que sea numérico. |
+| Clases de más de 64 estudiantes | Límite del protocolo. La app lo avisa al alcanzarlo ("La clase ya está completa") y lo explica en "Cómo funciona". |
 
 ## 11. Plan de trabajo
 
 1. **Agente jefe (núcleo delicado):** criptografía (X25519, HKDF), códec de los paquetes nuevos, armado de fragmentos, migración a la versión 4, servicios de inscripción del docente y del estudiante, con pruebas unitarias y una simulación completa en memoria (dos servicios "hablándose" sin Bluetooth real).
-2. **Agentes de Gemini (pantallas, en paralelo):** Inscribir estudiantes; Unirme a una clase; Estudiantes (estado, eliminar, retirar); Excel y reportes.
-3. **Sección "Cómo funciona"** (diseño aprobado aparte).
+2. **Pantallas de inscripción (agente jefe):** Inscribir estudiantes y Unirme a una clase. A los agentes de Gemini solo se les delega lo sencillo y aislado (por ejemplo, columnas del Excel).
+3. **Sección "Cómo funciona"**: la diseña y construye el agente jefe.
 4. **Prueba 02 con dos celulares:** inscribir desde la lista, inscribir a alguien fuera de la lista, conflicto por cambio de celular, eliminar, retirar, y asistencia completa después de inscribirse.
